@@ -1,8 +1,9 @@
-import { buffer2string, getUniqId, isEmpty, noop } from '@/common';
+import { buffer2string, escapeStringForRegExp, getUniqId, isEmpty, noop } from '@/common';
 import { forEachEntry } from '@/common/object';
 import { CHROME } from './ua';
 
 let encoder;
+let dnrRuleCounter = 1;
 
 export const VM_VERIFY = getUniqId('VM-Verify');
 /** @type {Object<string,GMReq.BG>} */
@@ -43,7 +44,10 @@ const API_FILTER = {
 const EXTRA_HEADERS = [
   browser.webRequest.OnBeforeSendHeadersOptions.EXTRA_HEADERS,
 ].filter(Boolean);
+const CAN_BLOCK_HEADERS = !MV3;
 const headersToInject = {};
+const headersRuleIds = {};
+const dnr = !CAN_BLOCK_HEADERS && browser.declarativeNetRequest;
 /** @param {chrome.webRequest.HttpHeader} header */
 const isVmVerify = header => header.name === VM_VERIFY;
 export const kCookie = 'cookie';
@@ -60,10 +64,10 @@ const SAME_SITE_MAP = {
 const kRequestHeaders = 'requestHeaders';
 const API_EVENTS = {
   onBeforeSendHeaders: [
-    onBeforeSendHeaders, kRequestHeaders, 'blocking', ...EXTRA_HEADERS,
+    onBeforeSendHeaders, kRequestHeaders, ...(CAN_BLOCK_HEADERS ? ['blocking'] : []), ...EXTRA_HEADERS,
   ],
   onHeadersReceived: [
-    onHeadersReceived, kResponseHeaders, 'blocking', ...EXTRA_HEADERS,
+    onHeadersReceived, kResponseHeaders, ...(CAN_BLOCK_HEADERS ? ['blocking'] : []), ...EXTRA_HEADERS,
   ],
 };
 
@@ -73,6 +77,7 @@ function onHeadersReceived({ [kResponseHeaders]: headers, requestId, url }) {
   if (req) {
     // Populate responseHeaders for GM_xhr's `response`
     req[kResponseHeaders] = headers.map(encodeWebRequestHeader).join('');
+    if (!CAN_BLOCK_HEADERS) return;
     const { storeId } = req;
     // Drop Set-Cookie headers if anonymous or using a custom storeId
     if (!req[kSetCookie] || storeId) {
@@ -111,13 +116,15 @@ function onBeforeSendHeaders({ [kRequestHeaders]: headers, requestId, url }) {
         headersMap[name] = h;
       }
     }
-    return {
-      [kRequestHeaders]: Object.values(Object.assign(headersMap, headers2, combinedHeaders))
-    };
+    if (CAN_BLOCK_HEADERS) {
+      return {
+        [kRequestHeaders]: Object.values(Object.assign(headersMap, headers2, combinedHeaders))
+      };
+    }
   }
 }
 
-export function toggleHeaderInjector(reqId, headers) {
+export function toggleHeaderInjector(reqId, headers, reqInfo) {
   if (headers) {
     /* Listening even if `headers` array is empty to get the request's id.
      * Registering just once to avoid a bug in Chrome:
@@ -129,14 +136,62 @@ export function toggleHeaderInjector(reqId, headers) {
     }
     // Adding even if empty so that the toggle-off `if` runs just once even when called many times
     headersToInject[reqId] = headers;
+    return !CAN_BLOCK_HEADERS && updateSessionRule(reqId, headers, reqInfo);
   } else if (reqId in headersToInject) {
     delete headersToInject[reqId];
+    const promise = !CAN_BLOCK_HEADERS && updateSessionRule(reqId, false);
     if (isEmpty(headersToInject)) {
       API_EVENTS::forEachEntry(([name, [listener]]) => {
         browser.webRequest[name].removeListener(listener);
       });
     }
+    return promise;
   }
+}
+
+function updateSessionRule(reqId, headers, reqInfo) {
+  if (!dnr) return;
+  const removeRuleIds = [];
+  const oldRuleId = headersRuleIds[reqId];
+  if (oldRuleId) {
+    removeRuleIds.push(oldRuleId);
+    delete headersRuleIds[reqId];
+  }
+  const addRules = !headers || isEmpty(headers) ? null : [buildSessionRule(reqId, headers, reqInfo)];
+  if (!addRules && !removeRuleIds.length) {
+    return;
+  }
+  return dnr.updateSessionRules({
+    ...(addRules && { addRules }),
+    ...(removeRuleIds.length && { removeRuleIds }),
+  }).catch(err => {
+    console.warn('[requests] updateSessionRules failed', err);
+  });
+}
+
+function buildSessionRule(reqId, headers, reqInfo) {
+  const id = dnrRuleCounter++;
+  const method = reqInfo?.method?.toLowerCase?.() || 'get';
+  const url = reqInfo.url.split('#', 1)[0];
+  headersRuleIds[reqId] = id;
+  return {
+    id,
+    priority: 1,
+    action: {
+      type: 'modifyHeaders',
+      requestHeaders: Object.values(headers).map(({ name, value, operation }) => ({
+        header: name,
+        operation: operation || 'set',
+        ...(value != null && { value }),
+      })),
+    },
+    condition: {
+      regexFilter: `^${escapeStringForRegExp(url)}$`,
+      requestMethods: [method],
+      resourceTypes: ['xmlhttprequest'],
+      tabIds: [chrome.tabs.TAB_ID_NONE],
+    },
+  };
 }
 
 /**

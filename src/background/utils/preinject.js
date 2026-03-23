@@ -23,7 +23,7 @@ import {
   S_VALUE_PRE,
 } from './storage';
 import { clearStorageCache, onStorageChanged } from './storage-cache';
-import { getFrameDocId, getFrameDocIdAsObj, tabsOnRemoved } from './tabs';
+import { executeCode, getFrameDocId, getFrameDocIdAsObj, tabsOnRemoved } from './tabs';
 import { addValueOpener, clearValueOpener, reifyValueOpener } from './values';
 import { ua } from './ua';
 
@@ -32,6 +32,7 @@ let injectInto;
 let ffInject;
 let xhrInject = false; // must be initialized for proper comparison when toggling
 let xhrInjectKey;
+const CAN_BLOCK_WEB_REQUESTS = !MV3;
 
 const sessionId = getUniqId();
 const API_HEADERS_RECEIVED = browser.webRequest.onHeadersReceived;
@@ -40,7 +41,7 @@ const API_CONFIG = {
   types: ['main_frame', 'sub_frame'],
 };
 const API_EXTRA = [
-  'blocking', // used for xhrInject and to make Firefox fire the event before GetInjected
+  CAN_BLOCK_WEB_REQUESTS && 'blocking', // used for xhrInject and to make Firefox fire the event before GetInjected
   kResponseHeaders,
   browser.webRequest.OnHeadersReceivedOptions.EXTRA_HEADERS,
 ].filter(Boolean);
@@ -195,7 +196,9 @@ addPublicCommands({
     const { tab, [kFrameId]: frameId } = src;
     const isTop = src[kTop];
     const tabId = tab.id;
-    injectContentRealm(items, tabId, frameId);
+    if (!MV3) {
+      injectContentRealm(items, tabId, frameId);
+    }
     if (!moreKey) return;
     if (!url) url = src.url || tab.url;
     const env = cache.get(moreKey)
@@ -307,6 +310,7 @@ function onOptionChanged(changes) {
 }
 
 function toggleXhrInject(enable) {
+  if (MV3) enable = false;
   if (enable) enable = injectInto !== CONTENT;
   if (xhrInject === enable) return;
   xhrInject = enable;
@@ -365,6 +369,9 @@ function onHeadersReceived(info) {
   if (bag && !bag[FORCE_CONTENT] && bag[INJECT]?.[SCRIPTS] && !skippedTabs[info.tabId]) {
     const ffReg = IS_FIREFOX && info.url.startsWith('https:')
       && detectStrictCsp(info, bag);
+    if (!CAN_BLOCK_WEB_REQUESTS) {
+      return ffReg;
+    }
     const res = xhrInject && prepareXhrBlob(info, bag);
     return ffReg ? ffReg.then(res && (() => res)) : res;
   }
@@ -592,8 +599,10 @@ function triageRealms(scripts, forceContent, tabId, frameId, bag) {
         const [, i, from, to] = metaStr;
         metaStr[0] = scr[__CODE][i].slice(from, to);
       }
-      code = '';
-      toContent.push([scr.id, scr.key.data]);
+      code = MV3 ? scr[__CODE] : '';
+      if (!MV3) {
+        toContent.push([scr.id, scr.key.data]);
+      }
     } else {
       metaStr[0] = '';
       code = forceContent ? ID_BAD_REALM : scr[__CODE];
@@ -619,10 +628,9 @@ function injectContentRealm(toContent, tabId, frameId) {
   for (const [id, dataKey] of toContent) {
     const scr = cache.get(S_SCRIPT_PRE + id); // TODO: recreate if expired?
     if (!scr || scr.key.data !== dataKey) continue;
-    browser.tabs.executeScript(tabId, {
-      code: scr[__CODE].join(''),
-      [RUN_AT]: `document_${scr[RUN_AT]}`.replace('body', 'start'),
-      [kFrameId]: frameId,
+    executeCode(tabId, scr[__CODE].join(''), {
+      frameId,
+      runAt: `document_${scr[RUN_AT]}`.replace('body', 'start'),
     }).then(scr.meta[UNWRAP] && (() => sendTabCmd(tabId, 'Run', id, { [kFrameId]: frameId })));
   }
 }

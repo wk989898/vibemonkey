@@ -11,6 +11,9 @@ import { getFrameDocIdAsObj, getFrameDocIdFromSrc } from './tabs';
 import { FIREFOX, navUA, navUAD } from './ua';
 import { vetUrl } from './url';
 
+const {
+  TextDecoder: SafeTextDecoder,
+} = global;
 addPublicCommands({
   /**
    * @param {GMReq.Message.Web} opts
@@ -27,7 +30,7 @@ addPublicCommands({
       tabId,
       [kFrameId]: frameId,
       frame: getFrameDocIdAsObj(frameId),
-      xhr: new XMLHttpRequest(),
+      ...!FETCH_TRANSPORT && { xhr: new XMLHttpRequest() },
     };
     const cb = res => requests[id] && (
       sendTabCmd(tabId, 'HttpRequested', res, req.frame)
@@ -42,7 +45,9 @@ addPublicCommands({
   },
   /** @return {void} */
   AbortRequest(id) {
-    requests[id]?.xhr.abort();
+    const req = requests[id];
+    if (req?.abort) req.abort();
+    else req?.xhr?.abort();
   },
   RevokeBlob(url) {
     const timer = cache.pop(`xhrBlob:${url}`);
@@ -60,10 +65,19 @@ const TEXT_CHUNK_SIZE = IS_FIREFOX
   ? 256e6 // Firefox: max 512MB and string char is 2 bytes (unicode)
   : 10e6; // Chrome: max 64MB and string char is 6 bytes max (like \u0001 in internal JSON)
 const BLOB_LIFE = 60e3;
+const FETCH_TRANSPORT = MV3 && !IS_FIREFOX;
+const LOAD = 'load';
+const LOADEND = 'loadend';
+const LOADSTART = 'loadstart';
+const PROGRESS = 'progress';
+const READYSTATECHANGE = 'readystatechange';
+const ABORT = 'abort';
+const TIMEOUT = 'timeout';
 const SEND_XHR_PROPS = ['readyState', 'status', 'statusText'];
 const SEND_PROGRESS_PROPS = ['lengthComputable', 'loaded', 'total'];
 const quoteHeaderValue = str => `"${str.replace(/[\\"]/g, '\\$&')}"`;
 const SEC_CH_UA = 'sec-ch-ua';
+const CHARSET_RE = /charset\s*=\s*(?:"([^"]+)"|([^;,\s]+))/i;
 const UA_GETTERS = {
   __proto__: null,
   'user-agent': val => val,
@@ -214,8 +228,9 @@ async function httpRequest(opts, events, src, cb) {
   if (!req || req.cb) return;
   req.cb = cb;
   req[kFileName] = opts[kFileName];
-  const { xhr } = req;
   const vmHeaders = {};
+  const headers = new Headers();
+  let authHeader;
   // Firefox can send Blob/ArrayBuffer directly
   const willStringifyBinaries = xhrType && !IS_FIREFOX;
   // Chrome can't fetch Blob URL in incognito so we use chunks
@@ -224,31 +239,36 @@ async function httpRequest(opts, events, src, cb) {
   const [body, contentType] = decodeBody(opts.data);
   // Firefox doesn't send cookies, https://github.com/violentmonkey/violentmonkey/issues/606
   // Both Chrome & FF need explicit routing of cookies in containers or incognito
-  const shouldSendCookies = !anonymous && (incognito || IS_FIREFOX);
+  const shouldSendCookies = !FETCH_TRANSPORT && !anonymous && (incognito || IS_FIREFOX);
   const uaHeaders = [];
-  req[kCookie] = !anonymous && !shouldSendCookies;
+  req[kCookie] = !anonymous && (FETCH_TRANSPORT || !shouldSendCookies);
   req[kSetCookie] = !anonymous;
-  xhr.open(opts.method || 'GET', url, true, opts.user || '', opts.password || '');
-  xhr.setRequestHeader(VM_VERIFY, id);
-  if (contentType) xhr.setRequestHeader('Content-Type', contentType);
+  if (contentType) headers.set('Content-Type', contentType);
+  headers.set(VM_VERIFY, id);
   opts.headers::forEachEntry(([name, value]) => {
     const nameLow = name.toLowerCase();
     const i = UA_HEADERS.indexOf(nameLow);
+    if (nameLow === 'authorization') {
+      authHeader = true;
+    }
     if (i >= 0 && (uaHeaders[i] = true) || FORBIDDEN_HEADER_RE.test(name)) {
-      pushWebRequestHeader(vmHeaders, name, value, nameLow);
+      pushWebRequestHeader(vmHeaders, name, value, nameLow,
+        nameLow === kCookie && !anonymous ? 'append' : 'set');
     } else {
-      xhr.setRequestHeader(name, value);
+      headers.set(name, value);
     }
   });
+  if (!authHeader && (opts.user || opts.password)) {
+    headers.set('Authorization', `Basic ${btoa(`${opts.user || ''}:${opts.password || ''}`)}`);
+  }
   opts.ua.forEach((val, i) => {
     if (!uaHeaders[i] && !deepEqual(val, !i ? navUA : navUAD[UA_PROPS[i]])) {
       const name = UA_HEADERS[i];
-      pushWebRequestHeader(vmHeaders, name, UA_GETTERS[name](val), name);
+      pushWebRequestHeader(vmHeaders, name, UA_GETTERS[name](val), name, 'set');
     }
   });
-  xhr[kResponseType] = willStringifyBinaries && 'blob' || xhrType || 'text';
-  xhr.timeout = Math.max(0, Math.min(0x7FFF_FFFF, opts.timeout)) || 0;
-  if (overrideMimeType) xhr.overrideMimeType(overrideMimeType);
+  const method = opts.method || 'GET';
+  const { xhr } = req;
   if (shouldSendCookies) {
     for (const store of await browser.cookies.getAllCookieStores()) {
       if (store.tabIds.includes(tab.id)) {
@@ -271,7 +291,29 @@ async function httpRequest(opts, events, src, cb) {
         cookies.map(c => `${c.name}=${c.value};`).join(' '));
     }
   }
-  toggleHeaderInjector(id, vmHeaders);
+  await toggleHeaderInjector(id, vmHeaders, FETCH_TRANSPORT && { method, url });
+  if (FETCH_TRANSPORT) {
+    return httpRequestFetch({
+      body,
+      blobbed: false,
+      events,
+      headers,
+      method,
+      overrideMimeType,
+      req,
+      url,
+      xhrType,
+      anonymous,
+      timeout: opts.timeout,
+    });
+  }
+  xhr.open(method, url, true, opts.user || '', opts.password || '');
+  headers.forEach((value, name) => {
+    xhr.setRequestHeader(name, value);
+  });
+  xhr[kResponseType] = willStringifyBinaries && 'blob' || xhrType || 'text';
+  xhr.timeout = Math.max(0, Math.min(0x7FFF_FFFF, opts.timeout)) || 0;
+  if (overrideMimeType) xhr.overrideMimeType(overrideMimeType);
   // Sending as params to avoid storing one-time init data in `requests`
   const callback = xhrCallbackWrapper(req, events, blobbed, chunked, opts[kResponseType] === 'json');
   const onerror = 'on' + ERROR;
@@ -281,6 +323,266 @@ async function httpRequest(opts, events, src, cb) {
   xhr.onabort = callback; // for gmxhr().abort()
   xhr[onerror] = xhr[UPLOAD][onerror] = callback; // show it in tab's console if there's no callback
   xhr.send(body);
+}
+
+async function httpRequestFetch({
+  body,
+  blobbed,
+  events,
+  headers,
+  method,
+  overrideMimeType,
+  req,
+  timeout,
+  url,
+  xhrType,
+  anonymous,
+}) {
+  const controller = new AbortController();
+  const { signal } = controller;
+  let timer;
+  let timedOut;
+  req.abort = () => controller.abort();
+  if (timeout > 0) {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, Math.min(0x7FFF_FFFF, timeout));
+  }
+  try {
+    if (events[0][READYSTATECHANGE]) {
+      await sendFetchEvent(req, READYSTATECHANGE, {
+        readyState: 1,
+        status: 0,
+        statusText: '',
+        finalUrl: url,
+      });
+    }
+    if (events[0][LOADSTART]) {
+      await sendFetchEvent(req, LOADSTART, {
+        readyState: 1,
+        status: 0,
+        statusText: '',
+        finalUrl: url,
+      });
+    }
+    const response = await fetch(url, {
+      body,
+      credentials: anonymous ? 'omit' : 'include',
+      headers,
+      method,
+      redirect: 'follow',
+      signal,
+    });
+    const finalUrl = req.url || response.url || url;
+    const status = response.status || 200;
+    const statusText = response.statusText || '';
+    const responseHeaders = req[kResponseHeaders] || encodeFetchHeaders(response.headers);
+    const finalType = overrideMimeType || response.headers.get('content-type') || '';
+    const total = +response.headers.get('content-length') || 0;
+    const lengthComputable = total > 0;
+    if (events[0][READYSTATECHANGE]) {
+      await sendFetchEvent(req, READYSTATECHANGE, {
+        readyState: 2,
+        status,
+        statusText,
+        finalUrl,
+        responseHeaders,
+      });
+    }
+    const {
+      data: raw,
+      loaded,
+    } = await loadFetchResponse(response, finalType, xhrType);
+    if (events[0][READYSTATECHANGE] && raw && (!xhrType ? raw.length : raw.size || raw.byteLength)) {
+      await sendFetchEvent(req, READYSTATECHANGE, {
+        readyState: 3,
+        status,
+        statusText,
+        finalUrl,
+        responseHeaders,
+      });
+    }
+    const sendResponseWith = events[0][LOAD]
+      ? LOAD
+      : events[0][READYSTATECHANGE] ? READYSTATECHANGE : LOADEND;
+    if (events[0][PROGRESS]) {
+      await sendFetchEvent(req, PROGRESS, {
+        readyState: 3,
+        status,
+        statusText,
+        finalUrl,
+        responseHeaders,
+        lengthComputable,
+        loaded,
+        total,
+      });
+    }
+    if (events[0][READYSTATECHANGE]) {
+      await sendFetchEvent(req, READYSTATECHANGE, {
+        readyState: 4,
+        status,
+        statusText,
+        finalUrl,
+        responseHeaders,
+        response: sendResponseWith === READYSTATECHANGE && raw,
+        contentType: finalType,
+        chunked: xhrType ? true : !xhrType && raw?.length > TEXT_CHUNK_SIZE,
+        blobbed,
+        lengthComputable,
+        loaded,
+        total,
+      });
+    }
+    if (events[0][LOAD]) {
+      await sendFetchEvent(req, LOAD, {
+        readyState: 4,
+        status,
+        statusText,
+        finalUrl,
+        responseHeaders,
+        response: sendResponseWith === LOAD && raw,
+        contentType: finalType,
+        chunked: xhrType ? true : !xhrType && raw?.length > TEXT_CHUNK_SIZE,
+        blobbed,
+        lengthComputable,
+        loaded,
+        total,
+      });
+    }
+    await sendFetchEvent(req, LOADEND, {
+      readyState: 4,
+      status,
+      statusText,
+      finalUrl,
+      responseHeaders,
+      response: sendResponseWith === LOADEND && raw,
+      contentType: finalType,
+      chunked: xhrType ? true : !xhrType && raw?.length > TEXT_CHUNK_SIZE,
+      blobbed,
+      lengthComputable,
+      loaded,
+      total,
+    });
+    if (req[kFileName] && raw?.size && typeof document !== 'undefined') {
+      downloadBlob(raw, req[kFileName]);
+    }
+  } catch (err) {
+    const type = timedOut ? TIMEOUT : err?.name === 'AbortError' ? ABORT : ERROR;
+    if (type === ERROR) {
+      await req.cb({
+        id: req.id,
+        [ERROR]: [err.message || `${err}`, err.name],
+        data: null,
+        type,
+      });
+    } else {
+      await sendFetchEvent(req, type, {
+        readyState: 4,
+        status: 0,
+        statusText: '',
+        finalUrl: req.url || url,
+      });
+    }
+    await sendFetchEvent(req, LOADEND, {
+      readyState: 4,
+      status: 0,
+      statusText: '',
+      finalUrl: req.url || url,
+    });
+  } finally {
+    clearTimeout(timer);
+    clearRequest(req);
+  }
+}
+
+async function sendFetchEvent(req, type, {
+  blobbed,
+  chunked,
+  contentType,
+  finalUrl,
+  lengthComputable,
+  loaded,
+  readyState,
+  response,
+  responseHeaders,
+  status,
+  statusText,
+  total,
+}) {
+  let responseData = null;
+  if (response != null) {
+    const isBlob = isObject(response);
+    const useChunks = chunked || isBlob;
+    const size = isBlob ? response.size : response.length;
+    const sizePerChunk = isBlob ? CHUNK_SIZE : TEXT_CHUNK_SIZE;
+    const getChunk = isBlob ? blob2chunk : text2chunk;
+    const numChunks = useChunks ? Math.ceil(size / sizePerChunk) || 1 : 0;
+    for (let i = 1; i < numChunks; i += 1) {
+      await req.cb({
+        id: req.id,
+        i,
+        chunk: i * sizePerChunk,
+        data: await getChunk(response, i, sizePerChunk),
+        size,
+      });
+    }
+    responseData = useChunks
+      ? await getChunk(response, 0, sizePerChunk)
+      : response;
+  }
+  await req.cb({
+    blobbed,
+    chunked,
+    contentType,
+    id: req.id,
+    type,
+    data: {
+      finalUrl,
+      readyState,
+      status,
+      statusText,
+      lengthComputable: !!lengthComputable,
+      loaded: loaded || 0,
+      total: total || 0,
+      [kResponse]: responseData,
+      [kResponseHeaders]: responseHeaders != null ? responseHeaders : null,
+    },
+    [UPLOAD]: 0,
+  });
+}
+
+async function loadFetchResponse(response, contentType, xhrType) {
+  if (xhrType) {
+    const blob = await response.blob();
+    return {
+      data: blob,
+      loaded: blob.size,
+    };
+  }
+  const buffer = await response.arrayBuffer();
+  return {
+    data: decodeText(buffer, contentType),
+    loaded: buffer.byteLength,
+  };
+}
+
+function decodeText(buffer, contentType) {
+  const label = CHARSET_RE.exec(contentType || '')?.[1]
+    || CHARSET_RE.exec(contentType || '')?.[2];
+  try {
+    return new SafeTextDecoder(label || 'utf-8').decode(buffer);
+  } catch (e) {
+    return new SafeTextDecoder().decode(buffer);
+  }
+}
+
+function encodeFetchHeaders(headers) {
+  let encoded = '';
+  headers.forEach((value, name) => {
+    encoded += `${name}: ${value}\r\n`;
+  });
+  return encoded;
 }
 
 /** @param {GMReq.BG} req */
@@ -337,7 +639,8 @@ function decodeBody([body, type, wasBlob]) {
  * @param {string} name
  * @param {string} value
  * @param {string} [nameLow]
+ * @param {string} [operation]
  */
-function pushWebRequestHeader(res, name, value, nameLow = name) {
-  res[nameLow] = { name, value };
+function pushWebRequestHeader(res, name, value, nameLow = name, operation) {
+  res[nameLow] = { name, value, operation };
 }

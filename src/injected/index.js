@@ -3,13 +3,20 @@ import { sendCmd } from './content/util';
 import { USERSCRIPT_META_INTRO } from './util';
 import './content';
 
+const isUserScriptUrl = topRenderMode === 1
+&& location.pathname.endsWith('.user.js');
+const isChromeMv3 = !IS_FIREFOX && browser.runtime.getManifest().manifest_version === 3;
+const canSelfInstall = isUserScriptUrl && (
+  isChromeMv3
+  || IS_FIREFOX
+  && location.protocol === 'file:'
+  && document.contentType === 'application/x-javascript' // FF uses this for file: scheme
+);
+
 // Script installation in Firefox as it does not support `onBeforeRequest` for `file:`
-// Using pathname and a case-sensitive check to match webRequest `urls` filter behavior
-if (IS_FIREFOX && topRenderMode === 1
-&& location.protocol === 'file:'
-&& location.pathname.endsWith('.user.js')
-&& document.contentType === 'application/x-javascript' // FF uses this for file: scheme
-) {
+// Chrome MV3 no longer supports blocking `webRequest`, so we self-install in the page instead.
+// Using pathname and a case-sensitive check to match webRequest `urls` filter behavior.
+if (canSelfInstall) {
   (async () => {
     const {
       fetch,
@@ -17,6 +24,7 @@ if (IS_FIREFOX && topRenderMode === 1
     } = global;
     const { referrer } = document;
     const { text: getText } = ResponseProto;
+    const isFirefoxFile = IS_FIREFOX && location.protocol === 'file:';
     const isFF68 = 'cookie' in Document[PROTO];
     const url = location.href;
     const fetchCode = async () => (await fetch(url, { mode: 'same-origin' }))::getText();
@@ -29,7 +37,7 @@ if (IS_FIREFOX && topRenderMode === 1
     await sendCmd('ConfirmInstall', { code, url, from: referrer });
     // FF68+ doesn't allow extension pages to get file: URLs anymore so we need to track it here
     // (detecting FF68 by a feature because we can't use getBrowserInfo here and UA may be altered)
-    if (isFF68) {
+    if (isFirefoxFile && isFF68) {
       /** @param {chrome.runtime.Port} */
       browser.runtime.onConnect.addListener(port => {
         if (port.name !== 'FetchSelf') return;
@@ -55,7 +63,7 @@ if (IS_FIREFOX && topRenderMode === 1
           }
         });
       });
-    } else {
+    } else if (!isChromeMv3) {
       closeSelf();
     }
     function closeSelf() {

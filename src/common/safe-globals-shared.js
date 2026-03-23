@@ -7,7 +7,7 @@
  */
 
 const global = process.env.TEST ? globalThis : this; // eslint-disable-line no-undef
-const { window } = global; // it's unforgeable so we extract it primarily to improve minification
+const window = global.window || global;
 export const VIOLENTMONKEY = 'Violentmonkey';
 export const AUTO = 'auto';
 export const CONTENT = 'content';

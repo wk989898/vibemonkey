@@ -43,6 +43,7 @@ export const tabsOnRemoved = browser.tabs.onRemoved;
 export let injectableRe = /^(https?|file|ftps?):/;
 export let fileSchemeRequestable;
 let cookieStorePrefix;
+const scripting = !IS_FIREFOX && chrome.scripting;
 
 try {
   // onUpdated is filterable only in desktop FF 61+
@@ -216,6 +217,38 @@ export async function forEachTab(callback) {
     // the same process used by our own pages like the background page, dashboard, or popups
     if (i % 20 === 0) await new Promise(setTimeout);
   }
+}
+
+export function executeCode(tabId, code, { frameId, runAt } = {}) {
+  if (!scripting) {
+    return browser.tabs.executeScript(tabId, {
+      code,
+      [RUN_AT]: runAt,
+      [kFrameId]: frameId,
+    });
+  }
+  return new SafePromise((resolve, reject) => {
+    chrome.scripting.executeScript({
+      args: [code],
+      func(injectedCode) {
+        return globalThis.eval
+          ? globalThis.eval(injectedCode)
+          : globalThis.Function(injectedCode)();
+      },
+      target: {
+        tabId,
+        ...(frameId >= 0 && { frameIds: [frameId] }),
+      },
+      ...(runAt === 'document_start' && { injectImmediately: true }),
+    }, results => {
+      const err = chrome.runtime.lastError;
+      if (err) {
+        reject(new SafeError(err.message));
+      } else {
+        resolve(results?.map(item => item.result) || []);
+      }
+    });
+  });
 }
 
 /**

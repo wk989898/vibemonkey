@@ -55,8 +55,25 @@ function runCommand(command, args) {
  * This task is only used to tweak dist/manifest.json without rebuilding
  */
 async function manifest() {
-  const base = JSON.parse(await fs.readFile(`${DIST}/manifest.json`, 'utf8'));
+  let base;
+  try {
+    base = JSON.parse(await fs.readFile(`${DIST}/manifest.json`, 'utf8'));
+  } catch {
+    // Initial build may not have created manifest yet, we'll synthesize it here.
+  }
   const data = await buildManifest(base);
+  const bgFiles = await fs.readdir(`${DIST}/background`).catch(() => []);
+  const bgScripts = bgFiles
+  .filter(file => file.endsWith('.js'))
+  .map(file => `background/${file}`);
+  if (data.manifest_version === 3) {
+    if (bgScripts.length !== 1) {
+      throw new Error(`Chrome MV3 background service worker must be a single JS file, got: ${bgScripts.join(', ')}`);
+    }
+    data.background.service_worker = bgScripts[0];
+  } else {
+    data.background.scripts = bgScripts;
+  }
   await fs.mkdir(DIST).catch(() => {});
   await fs.writeFile(`${DIST}/manifest.json`, JSON.stringify(data), 'utf8');
 }
@@ -177,7 +194,7 @@ const pack = gulp.parallel(createIcons, copyI18n, copyZip);
 exports.clean = clean;
 exports.manifest = manifest;
 exports.dev = gulp.parallel(gulp.series(pack, watch), jsDev);
-exports.build = gulp.series(clean, gulp.parallel(pack, jsProd));
+exports.build = gulp.series(clean, gulp.parallel(pack, jsProd), manifest);
 exports.i18n = updateI18n;
 exports.check = checkI18n;
 exports.copyI18n = copyI18n;

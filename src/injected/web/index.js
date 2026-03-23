@@ -109,6 +109,9 @@ addHandlers({
             set: onCodeSet,
           });
         }
+        if (script.code) {
+          runContentCode(script);
+        }
       }
     }
     if (!PAGE_MODE_HANDSHAKE) toRunNow::forEach(onCodeSet);
@@ -143,4 +146,18 @@ function onCodeSet(fn) {
   }
   bridge.post('Run', item.id);
   wrapper::fn(gm, logging.error);
+}
+
+function runContentCode(script) {
+  try {
+    const code = isObject(script.code) ? script.code.join('') : script.code;
+    script.code = '';
+    if (global.eval) {
+      global.eval(code);
+    } else {
+      global.Function(code)();
+    }
+  } catch (err) {
+    logging.error(err);
+  }
 }

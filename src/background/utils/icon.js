@@ -24,7 +24,7 @@ export const getImageData = url => iconCache[url] || (iconCache[url] = loadIcon(
 // Firefox Android does not support such APIs, use noop
 const browserAction = (() => {
   // Using `chrome` namespace in order to skip our browser.js polyfill in Chrome
-  const api = chrome.browserAction;
+  const api = chrome.action || chrome.browserAction;
   // Some methods like setBadgeText added callbacks only in Chrome 67+.
   const makeMethod = fn => (...args) => {
     try {
@@ -50,8 +50,11 @@ const KEY_SHOW_BADGE = 'showBadge';
 const KEY_BADGE_COLOR = 'badgeColor';
 const KEY_BADGE_COLOR_BLOCKED = 'badgeColorBlocked';
 const titleBlacklisted = i18n('failureReasonBlacklisted');
-const titleDefault = extensionManifest[BROWSER_ACTION].default_title;
-const iconDefault = extensionManifest[BROWSER_ACTION].default_icon[16].match(/\d+(\w*)\./)[1];
+const titleDefault = extensionManifest[BROWSER_ACTION]?.default_title || extensionManifest.name;
+const iconDefault = (
+  extensionManifest[BROWSER_ACTION]?.default_icon?.[16]
+  || extensionManifest.icons[16]
+).match(/\d+(\w*)\./)[1];
 const titleDisabled = i18n('menuScriptDisabled');
 const titleNoninjectable = i18n('failureReasonNoninjectable');
 const titleSkipped = i18n('skipScriptsMsg');
@@ -218,15 +221,20 @@ async function setIcon({ id: tabId } = {}, data = badges[tabId] || {}) {
   for (const n of SIZES) {
     const url = `${ICON_PREFIX}${n}${mod}.png`;
     pathData[n] = url;
-    iconData[n] = iconDataCache[url]
-      || await (iconCache[url] || (iconCache[url] = loadIcon(url))) && iconDataCache[url];
+    if (!MV3) {
+      iconData[n] = iconDataCache[url]
+        || await (iconCache[url] || (iconCache[url] = loadIcon(url))) && iconDataCache[url];
+    }
   }
   // imageData doesn't work in Firefox Android, so we also set path here
-  browserAction.setIcon({
+  const payload = {
     tabId,
     path: pathData,
-    imageData: iconData,
-  });
+  };
+  if (!MV3) {
+    payload.imageData = iconData;
+  }
+  browserAction.setIcon(payload);
 }
 
 /** Omitting `data` = check whether injection is allowed for `url` */
@@ -262,6 +270,13 @@ export function handleHotkeyOrMenu(id, tab) {
 }
 
 async function loadIcon(url) {
+  if (MV3 && typeof Image === 'undefined') {
+    const res = url.startsWith(ICON_PREFIX)
+      ? url
+      : await loadDataUri(url);
+    iconCache[url] = res;
+    return res;
+  }
   const img = new Image();
   const isOwn = url.startsWith(ICON_PREFIX);
   img.src = isOwn ? url.slice(extensionOrigin.length) // must be a relative path in Firefox Android
@@ -297,6 +312,28 @@ async function loadIcon(url) {
   }
   iconCache[url] = res;
   return res;
+}
+
+async function loadDataUri(url) {
+  url = url.startsWith('data:') ? url
+    : url[0] === 'i' ? url
+      : makeDataUri(url = await loadStorageCache(url))
+        || url;
+  if (!url || url.startsWith('data:')) {
+    return url;
+  }
+  const res = await fetch(url);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  return `data:${res.headers.get('content-type') || 'image/png'};base64,${bytesToBase64(bytes)}`;
+}
+
+function bytesToBase64(bytes) {
+  let res = '';
+  const step = 0x8000;
+  for (let i = 0; i < bytes.length; i += step) {
+    res += String.fromCharCode(...bytes.subarray(i, i + step));
+  }
+  return btoa(res);
 }
 
 async function loadStorageCache(url) {

@@ -4,7 +4,9 @@ import cache from './cache';
 import { addPublicCommands, commands } from './init';
 import { getOption } from './options';
 import { parseMeta, matchUserScript } from './script';
-import { fileSchemeRequestable, getTabUrl, NEWTAB_URL_RE, tabsOnUpdated } from './tabs';
+import {
+  executeCode, fileSchemeRequestable, getTabUrl, NEWTAB_URL_RE, tabsOnUpdated,
+} from './tabs';
 import { FIREFOX } from './ua';
 
 addPublicCommands({
@@ -32,9 +34,11 @@ async function confirmInstall({ code, from, url, fs, parsed }, { tab = {} }) {
   }
   const confirmKey = getUniqId();
   const { active, id: tabId, incognito } = tab;
+  const tabUrl = getTabUrl(tab);
   // Not testing tab.pendingUrl because it will be always equal to `url`
   const canReplaceCurTab = (!incognito || IS_FIREFOX) && (
     url === from
+    || url === tabUrl
     || cache.has(`autoclose:${tabId}`)
     || NEWTAB_URL_RE.test(from));
   /** @namespace VM.ConfirmCache */
@@ -95,9 +99,7 @@ ${code?.length > 1e6 ? code.slice(0, 1e6) + '...' : code}`;
     if (tabId < 0) {
       console.warn(error);
     } else {
-      browser.tabs.executeScript(tabId, {
-        code: `console.warn(${JSON.stringify(error)})`,
-      });
+      executeCode(tabId, `console.warn(${JSON.stringify(error)})`);
       browser.tabs.update(tabId, { url });
     }
   }
@@ -129,33 +131,35 @@ browser.tabs.onCreated.addListener((tab) => {
   }
 });
 
-browser.webRequest.onBeforeRequest.addListener((req) => {
-  const { method, tabId, url } = req;
-  if (method !== 'GET') {
-    return;
-  }
-  // open a real URL for simplified userscript URL listed in devtools of the web page
-  if (url.startsWith(extensionRoot)) {
-    return { redirectUrl: resolveVirtualUrl(url) };
-  }
-  let isWhitelisted;
-  if (!cache.has(`bypass:${url}`)
-  && ((isWhitelisted = whitelistRe.test(url)) || !blacklistRe.test(url))) {
-    maybeInstallUserJs(tabId, url, isWhitelisted);
-    return IS_FIREFOX
-      ? { cancel: true } // for sites with strict CSP in FF
-      : { redirectUrl: 'javascript:void 0' }; // eslint-disable-line no-script-url
-  }
-}, {
-  urls: [
-    // 1. *:// comprises only http/https
-    // 2. the API ignores #hash part
-    // 3. Firefox: onBeforeRequest does not work with file:// or moz-extension://
-    '*://*/*.user.js',
-    '*://*/*.user.js?*',
-    `${FILE_GLOB_ALL}.user.js`,
-    `${FILE_GLOB_ALL}.user.js?*`,
-    `${extensionRoot}*.user.js`,
-  ],
-  types: ['main_frame'],
-}, ['blocking']);
+if (!MV3) {
+  browser.webRequest.onBeforeRequest.addListener((req) => {
+    const { method, tabId, url } = req;
+    if (method !== 'GET') {
+      return;
+    }
+    // open a real URL for simplified userscript URL listed in devtools of the web page
+    if (url.startsWith(extensionRoot)) {
+      return { redirectUrl: resolveVirtualUrl(url) };
+    }
+    let isWhitelisted;
+    if (!cache.has(`bypass:${url}`)
+    && ((isWhitelisted = whitelistRe.test(url)) || !blacklistRe.test(url))) {
+      maybeInstallUserJs(tabId, url, isWhitelisted);
+      return IS_FIREFOX
+        ? { cancel: true } // for sites with strict CSP in FF
+        : { redirectUrl: 'javascript:void 0' }; // eslint-disable-line no-script-url
+    }
+  }, {
+    urls: [
+      // 1. *:// comprises only http/https
+      // 2. the API ignores #hash part
+      // 3. Firefox: onBeforeRequest does not work with file:// or moz-extension://
+      '*://*/*.user.js',
+      '*://*/*.user.js?*',
+      `${FILE_GLOB_ALL}.user.js`,
+      `${FILE_GLOB_ALL}.user.js?*`,
+      `${extensionRoot}*.user.js`,
+    ],
+    types: ['main_frame'],
+  }, ['blocking']);
+}
