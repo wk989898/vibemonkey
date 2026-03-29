@@ -1,7 +1,7 @@
 const EVENT_STREAM_RE = /\btext\/event-stream\b/i;
 const HTML_LIKE_RE = /^\s*<(?:!doctype|html|body)\b/i;
 const JSON_CONTENT_TYPE_RE = /\b(?:application|text)\/(?:[\w.+-]*\+)?json\b/i;
-const JSON_LIKE_RE = /^\s*[{\[]/;
+const JSON_LIKE_RE = /^\s*[{[]/;
 const PLAIN_CONTENT_TYPE_RE = /\btext\/(?!event-stream\b|html\b)[^;]+/i;
 
 type AiStreamParserMode = "auto" | "json" | "plain" | "sse";
