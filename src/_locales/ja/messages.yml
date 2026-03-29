@@ -230,7 +230,7 @@ extDescription:
   message: 幅広いブラウザに対応のオープンソースのユーザースクリプト管理ツール
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: ブロックリストに登録済み

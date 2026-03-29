@@ -6,19 +6,36 @@
           <div class="btn-group">
             <Dropdown
               v-model="state.menuNew"
-              :class="{active: state.menuNew}"
-              :closeAfterClick="true">
-              <Tooltip :content="i18n('buttonNew')" placement="bottom" align="start" :disabled="state.menuNew">
+              :class="{ active: state.menuNew }"
+              :closeAfterClick="true"
+            >
+              <Tooltip
+                :content="i18n('buttonNew')"
+                placement="bottom"
+                align="start"
+                :disabled="state.menuNew"
+              >
                 <a class="btn-ghost" tabindex="0" ref="$menuNew">
                   <Icon name="plus" />
                 </a>
               </Tooltip>
               <template #content>
-                <a class="dropdown-menu-item"
-                  v-for="([text, props], i) in NEW_LINKS" :key="i" v-text="text" v-bind="props"/>
-                <a class="dropdown-menu-item" v-if="isEmpty"
+                <a
+                  class="dropdown-menu-item"
+                  v-for="([text, props], i) in NEW_LINKS"
+                  :key="i"
+                  v-text="text"
+                  v-bind="props"
+                />
+                <a
+                  class="dropdown-menu-item"
+                  v-if="isEmpty"
                   v-text="`${i18n('buttonImportData')} / ${i18n('labelSync')}...`"
-                  @click="store.isEmpty = 1; setLocationHash(TAB_SETTINGS)"/>
+                  @click="
+                    store.isEmpty = 1;
+                    setLocationHash(TAB_SETTINGS);
+                  "
+                />
               </template>
             </Dropdown>
             <Tooltip :content="i18n('updateScriptsAll')" placement="bottom" align="start">
@@ -29,11 +46,12 @@
           </div>
           <div v-if="state.filteredScripts.length" class="btn-group">
             <a
-              v-for="({ icon, num }, key) in batchActions" :key
+              v-for="({ icon, num }, key) in batchActions"
+              :key
               class="btn-ghost"
               :class="{
                 'has-error': state.batchAction.action === key,
-                 disabled: store.batch,
+                disabled: store.batch,
               }"
               :data-batch-action="key"
               tabindex="0"
@@ -44,12 +62,19 @@
               <span class="ml-1" v-if="state.batchAction.action === key">❗</span>
             </a>
             <Tooltip :content="state.sizes" placement="bottom">
-              <div class="btn-hint subtle"
-                   v-text="i18n('hintForBatchAction', `${state.filteredScripts.length}`)"
-                   :data-size="state.size"/>
+              <div
+                class="btn-hint subtle"
+                v-text="i18n('hintForBatchAction', `${state.filteredScripts.length}`)"
+                :data-size="state.size"
+              />
             </Tooltip>
             <Tooltip :content="i18n('buttonUndo')" placement="bottom" align="start">
-              <a v-if="state.batchAction.undo" class="btn-ghost" tabindex="0" @click.prevent="state.batchAction.undo">
+              <a
+                v-if="state.batchAction.undo"
+                class="btn-ghost"
+                tabindex="0"
+                @click.prevent="state.batchAction.undo"
+              >
                 <Icon name="undo" />
               </a>
             </Tooltip>
@@ -59,15 +84,16 @@
           <div class="ml-2" v-text="i18n('headerRecycleBin')" :data-size="state.size" />
         </Tooltip>
         <div class="flex-auto"></div>
-        <span class="ml-1">{{ i18n('sortOrder') }}
+        <span class="ml-1"
+          >{{ i18n("sortOrder") }}
           <select :value="filters.sort" @change="handleOrderChange" class="h-100">
             <option
-              v-for="({text, title}, name) in sortModes"
+              v-for="({ text, title }, name) in sortModes"
               v-text="text"
               :title
               :key="name"
-              :value="name">
-            </option>
+              :value="name"
+            ></option>
           </select>
         </span>
         <Dropdown align="right" class="filter-sort">
@@ -78,8 +104,10 @@
           </Tooltip>
           <template #content>
             <div v-show="currentSortCompare">
-              <SettingCheck name="filters.showEnabledFirst"
-                :label="i18n('optionShowEnabledFirst')" />
+              <SettingCheck
+                name="filters.showEnabledFirst"
+                :label="i18n('optionShowEnabledFirst')"
+              />
             </div>
             <div>
               <SettingCheck name="filters.showOrder" :label="i18n('labelShowOrder')" />
@@ -89,27 +117,37 @@
             </div>
             <div class="mr-2c">
               <SettingCheck name="filters.viewTable" :label="i18n('labelViewTable')" />
-              <SettingCheck name="filters.viewSingleColumn" :label="i18n('labelViewSingleColumn')" />
+              <SettingCheck
+                name="filters.viewSingleColumn"
+                :label="i18n('labelViewSingleColumn')"
+              />
             </div>
           </template>
         </Dropdown>
         <!-- form and id are required for the built-in autocomplete using entered values -->
-        <form class="filter-search hidden-xs" @submit.prevent
-              :style="{ 'min-width': '10em', 'max-width': 5 + Math.max(20, state.search.value.length) + 'ex' }">
+        <form
+          class="filter-search hidden-xs"
+          @submit.prevent
+          :style="{
+            'min-width': '10em',
+            'max-width': 5 + Math.max(20, state.search.value.length) + 'ex',
+          }"
+        >
           <label>
             <input
               type="search"
-              :class="{'has-error': state.search.error}"
+              :class="{ 'has-error': state.search.error }"
               :title="state.search.error"
               :placeholder="i18n('labelSearchScript')"
               v-model="state.search.value"
               ref="refSearch"
-              id="installed-search">
+              id="installed-search"
+            />
             <Icon name="search" />
           </label>
         </form>
         <Dropdown align="right">
-          <a class="btn-ghost" tabindex="0" :class="{'has-error': state.search.error}">
+          <a class="btn-ghost" tabindex="0" :class="{ 'has-error': state.search.error }">
             <Icon name="question"></Icon>
           </a>
           <template #content>
@@ -121,18 +159,24 @@
         </Dropdown>
       </header>
       <div v-if="showRecycle" class="hint mx-1 my-1 flex flex-col">
-        <span v-text="i18n('hintRecycleBin')"/>
-        <a v-if="store.removedScripts.length" v-text="i18n('buttonEmptyRecycleBin')" tabindex="0"
-           @click="handleEmptyRecycleBin"/>
+        <span v-text="i18n('hintRecycleBin')" />
+        <a
+          v-if="store.removedScripts.length"
+          v-text="i18n('buttonEmptyRecycleBin')"
+          tabindex="0"
+          @click="handleEmptyRecycleBin"
+        />
       </div>
       <div v-else-if="message" class="hint mx-1 my-1 flex flex-col" v-text="message"></div>
-      <div class="scripts"
+      <div
+        class="scripts"
         v-focus="!state.script"
         ref="refList"
         :style="`--num-columns:${state.numColumns}`"
         :data-columns="state.numColumns"
         :data-show-order="filters.showOrder || null"
-        :data-table="filters.viewTable || null">
+        :data-table="filters.viewTable || null"
+      >
         <ScriptItem
           v-for="(script, index) in state.sortedScripts"
           v-show="!state.search.rules.length || script.$cache.show !== false"
@@ -158,109 +202,137 @@
     <teleport to="body">
       <!-- KeepAlive must be a direct parent of the component, not of teleport -->
       <KeepAlive :key="store.route.hash" :max="5">
-      <edit
-        v-if="state.script"
-        :initial="state.script"
-        :initial-code="state.code"
-        :read-only="!!state.script.config.removed"
-        @close="handleEditScript()"
-      />
+        <edit
+          v-if="state.script"
+          :initial="state.script"
+          :initial-code="state.code"
+          :read-only="!!state.script.config.removed"
+          @close="handleEditScript()"
+        />
       </KeepAlive>
     </teleport>
   </div>
 </template>
 
-<script setup>
-import { computed, reactive, nextTick, onMounted, watch, ref, onBeforeUnmount } from 'vue';
-import { i18n, sendCmdDirectly, debounce, ensureArray, trueJoin, formatByteLength } from '@/common';
-import { INFERRED } from '@/common/consts';
-import handlers from '@/common/handlers';
-import options from '@/common/options';
-import { EXTERNAL_LINK_PROPS, getActiveElement, isTouch, showConfirmation, showMessage, vFocus } from '@/common/ui';
-import hookSetting from '@/common/hook-setting';
-import { forEachKey } from '@/common/object';
-import { setRoute, lastRoute } from '@/common/router';
-import { keyboardService, handleTabNavigation } from '@/common/keyboard';
-import { TAB_SETTINGS } from '@/common/safe-globals';
-import { loadData } from '@/options';
-import Dropdown from 'vueleton/lib/dropdown';
-import Tooltip from 'vueleton/lib/tooltip';
-import SettingCheck from '@/common/ui/setting-check';
-import Icon from '@/common/ui/icon';
-import { customCssElem, findStyleSheetRules } from '@/common/ui/style';
-import { getSortCollator } from '@/common/ui/util';
+<script setup lang="ts">
+import { computed, reactive, nextTick, onMounted, watch, ref, onBeforeUnmount } from "vue";
+import { i18n, sendCmdDirectly, debounce, ensureArray, trueJoin, formatByteLength } from "@/common";
+import { INFERRED } from "@/common/consts";
+import handlers from "@/common/handlers";
+import options from "@/common/options";
 import {
-  createSearchRules, formatSizesStr, markRemove, performSearch, runInBatch, setLocationHash,
-  SIZE_TITLES, store, TOGGLE_OFF, TOGGLE_ON,
-} from '../utils';
-import toggleDragging from '../utils/dragging';
-import ScriptItem from './script-item';
-import Edit from './edit';
+  EXTERNAL_LINK_PROPS,
+  getActiveElement,
+  isTouch,
+  showConfirmation,
+  showMessage,
+  vFocus,
+} from "@/common/ui";
+import hookSetting from "@/common/hook-setting";
+import { forEachKey } from "@/common/object";
+import { setRoute, lastRoute } from "@/common/router";
+import { keyboardService, handleTabNavigation } from "@/common/keyboard";
+import { TAB_SETTINGS } from "@/common/safe-globals";
+import { loadData } from "@/options";
+import Dropdown from "vueleton/lib/dropdown";
+import Tooltip from "vueleton/lib/tooltip";
+import SettingCheck from "@/common/ui/setting-check.vue";
+import Icon from "@/common/ui/icon.vue";
+import { customCssElem, findStyleSheetRules } from "@/common/ui/style";
+import { getSortCollator } from "@/common/ui/util";
+import {
+  createSearchRules,
+  formatSizesStr,
+  markRemove,
+  performSearch,
+  runInBatch,
+  setLocationHash,
+  SIZE_TITLES,
+  store,
+  TOGGLE_OFF,
+  TOGGLE_ON,
+} from "../utils";
+import toggleDragging from "../utils/dragging";
+import ScriptItem from "./script-item.vue";
+import Edit from "./edit/index.vue";
 
 const NEW_LINKS = [
-  [i18n('buttonNew'),
-    { tabIndex: 0, onclick: () => handleEditScript('_new') }],
-  [i18n('installFrom', 'OpenUserJS'),
-    { href: 'https://openuserjs.org/', ...EXTERNAL_LINK_PROPS }],
-  [i18n('installFrom', 'GreasyFork'),
-    { href: `https://greasyfork.org/scripts`, ...EXTERNAL_LINK_PROPS }],
-  [i18n('buttonInstallFromURL'),
-    { tabIndex: 0, onclick: handleInstallFromURL }],
+  [i18n("buttonNew"), { tabIndex: 0, onclick: () => handleEditScript("_new") }],
+  [i18n("installFrom", "OpenUserJS"), { href: "https://openuserjs.org/", ...EXTERNAL_LINK_PROPS }],
+  [
+    i18n("installFrom", "GreasyFork"),
+    { href: `https://greasyfork.org/scripts`, ...EXTERNAL_LINK_PROPS },
+  ],
+  [i18n("buttonInstallFromURL"), { tabIndex: 0, onclick: handleInstallFromURL }],
 ];
-const EDIT = 'edit';
-const REMOVE = 'remove';
-const RESTORE = 'restore';
-const TOGGLE = 'toggle';
-const UNDO = 'undo';
-const UPDATE = 'update';
+const EDIT = "edit";
+const REMOVE = "remove";
+const RESTORE = "restore";
+const TOGGLE = "toggle";
+const UNDO = "undo";
+const UPDATE = "update";
 const collator = getSortCollator();
 const cmpName = (a, b) => collator.compare(a.$cache.lowerName, b.$cache.lowerName);
 /** @type {{ [key:string]: SortMode }} */
 const sortModes = [
-  ['exec', i18n('filterExecutionOrder')],
-  ['alpha', i18n('filterAlphabeticalOrder'), '', cmpName],
-  ['author', i18n('labelAuthor').replace(/\W+/, '').toLowerCase(), '',
-    (a, b) => collator.compare(a.meta.author || '', b.meta.author || '') || cmpName(a, b)],
-  [UPDATE, i18n('filterLastUpdateOrder'), '',
-    (a, b) => (+b.props.lastUpdated || 0) - (+a.props.lastUpdated || 0)],
-  ['visit', i18n('filterLastVisitOrder'), i18n('filterLastVisitOrderTooltip'),
-    (a, b) => (b[INFERRED].visit || 0) - (a[INFERRED].visit || 0)],
-  ['size', i18n('filterSize'), '',
-    (a, b) => a.$cache.sizeNum - b.$cache.sizeNum],
-].reduce((res, [key, text, title, compare]) => (
-  (res[key] = {text, title, compare}),
-  (res[key + '-'] = /**@namespace SortMode*/{
-    text: text + ' ⯆',
-    title: title,
-    compare: compare ? (a, b) => compare(b, a) :
-      /** @param {VMScript} a
-       * @param {VMScript} b */
-      (a, b) => b.props.position - a.props.position,
-  }),
-  res
-), {});
+  ["exec", i18n("filterExecutionOrder")],
+  ["alpha", i18n("filterAlphabeticalOrder"), "", cmpName],
+  [
+    "author",
+    i18n("labelAuthor").replace(/\W+/, "").toLowerCase(),
+    "",
+    (a, b) => collator.compare(a.meta.author || "", b.meta.author || "") || cmpName(a, b),
+  ],
+  [
+    UPDATE,
+    i18n("filterLastUpdateOrder"),
+    "",
+    (a, b) => (+b.props.lastUpdated || 0) - (+a.props.lastUpdated || 0),
+  ],
+  [
+    "visit",
+    i18n("filterLastVisitOrder"),
+    i18n("filterLastVisitOrderTooltip"),
+    (a, b) => (b[INFERRED].visit || 0) - (a[INFERRED].visit || 0),
+  ],
+  ["size", i18n("filterSize"), "", (a, b) => a.$cache.sizeNum - b.$cache.sizeNum],
+].reduce(
+  (res, [key, text, title, compare]) => (
+    (res[key] = { text, title, compare }),
+    (res[key + "-"] = /**@namespace SortMode*/ {
+      text: text + " ⯆",
+      title: title,
+      compare: compare
+        ? (a, b) => compare(b, a)
+        : /** @param {VMScript} a
+           * @param {VMScript} b */
+          (a, b) => b.props.position - a.props.position,
+    }),
+    res
+  ),
+  {},
+);
 const filters = reactive({
   /** @type {Boolean} */ showEnabledFirst: null,
   /** @type {Boolean} */ showOrder: null,
   /** @type {Boolean} */ showVisit: null,
   /** @type {Boolean} */ viewSingleColumn: null,
   /** @type {Boolean} */ viewTable: null,
-  sort: '',
+  sort: "",
 });
-const combinedCompare = cmpFunc => (
+const combinedCompare = (cmpFunc) =>
   filters.showEnabledFirst
-    ? ((a, b) => b.config.enabled - a.config.enabled || cmpFunc(a, b))
-    : cmpFunc
-);
-filters::forEachKey(key => {
+    ? (a, b) => b.config.enabled - a.config.enabled || cmpFunc(a, b)
+    : cmpFunc;
+forEachKey.call(filters, (key) => {
   hookSetting(`filters.${key}`, (val) => {
-    filters[key] = key === 'sort' && !sortModes[val]
-      ? Object.keys(sortModes)[0]
-      : val;
+    const nextVal = val as string | boolean | null;
+    filters[key] =
+      key === "sort" && !sortModes[nextVal as string] ? Object.keys(sortModes)[0] : nextVal;
   });
 });
 
-const conditionAll = 'tabScripts';
+const conditionAll = "tabScripts";
 const conditionSearch = `${conditionAll} && inputFocus`;
 const conditionNotSearch = `${conditionAll} && !inputFocus`;
 const conditionScriptFocused = `${conditionNotSearch} && selectedScript && !showRecycle`;
@@ -268,15 +340,16 @@ const conditionScriptFocusedRecycle = `${conditionNotSearch} && selectedScript &
 const conditionScriptFocusedWithoutButton = `${conditionNotSearch} && !buttonFocus`;
 const conditionHotkeys = `${conditionNotSearch} && selectedScript && showHotkeys`;
 const scriptHotkeys = {
-  [EDIT]: 'e',
-  [TOGGLE]: 'space',
-  [UPDATE]: 'r',
-  [RESTORE]: 'r',
-  [REMOVE]: 'x',
+  [EDIT]: "e",
+  [TOGGLE]: "space",
+  [UPDATE]: "r",
+  [RESTORE]: "r",
+  [REMOVE]: "x",
 };
-const registerHotkey = (callback, items) => items.map(([key, condition, caseSensitive]) => (
-  keyboardService.register(key, callback, { condition, caseSensitive })
-));
+const registerHotkey = (callback, items) =>
+  items.map(([key, condition, caseSensitive]) =>
+    keyboardService.register(key, callback, { condition, caseSensitive }),
+  );
 
 const MAX_BATCH_DURATION = 100;
 const RENDER_ALL = 1e9;
@@ -293,21 +366,21 @@ const isEmpty = ref();
 const refSearch = ref();
 const refList = ref();
 const scroller = ref();
-const kScrollTop = 'scrollTop';
+const kScrollTop = "scrollTop";
 
 const state = reactive({
   focusedIndex: -1,
   menuNew: false,
   showHotkeys: false,
-  search: store.search = {
-    value: '',
+  search: (store.search = {
+    value: "",
     error: null,
-    ...createSearchRules(''),
-  },
+    ...createSearchRules(""),
+  }),
   sortedScripts: [],
   filteredScripts: [],
   script: null,
-  code: '',
+  code: "",
   numColumns: 1,
   batchRender: {
     limit: step,
@@ -316,12 +389,12 @@ const state = reactive({
     action: null,
     [UNDO]: null,
   },
-  size: '',
-  sizes: '',
+  size: "",
+  sizes: "",
 });
 
 const showRecycle = computed(() => store.route.paths[0] === TAB_RECYCLE);
-const draggableRaw = computed(() => !showRecycle.value && filters.sort.startsWith('exec'));
+const draggableRaw = computed(() => !showRecycle.value && filters.sort.startsWith("exec"));
 const draggable = computed(() => isTouch && draggableRaw.value);
 const currentSortCompare = computed(() => sortModes[filters.sort]?.compare);
 const selectedScript = computed(() => state.filteredScripts[state.focusedIndex]);
@@ -329,34 +402,45 @@ const message = computed(() => {
   if (!store.loaded) {
     return null;
   }
-  if (state.search.rules.length ? !state.sortedScripts.find(s => s.$cache.show !== false) : !state.sortedScripts.length) {
-    return i18n('labelNoSearchScripts');
+  if (
+    state.search.rules.length
+      ? !state.sortedScripts.find((s) => s.$cache.show !== false)
+      : !state.sortedScripts.length
+  ) {
+    return i18n("labelNoSearchScripts");
   }
   return null;
 });
-const searchNeedsCodeIds = computed(() => state.search.rules.some(rule => !rule.scope || rule.scope === 'code')
-        && store.scripts.filter(s => s.$cache.code == null).map(s => s.props.id));
-const activeTags = computed(() => state.search.tokens.filter(token => token.prefix === '#' && !token.negative).map(token => token.parsed));
-const getCurrentList = () => showRecycle.value ? store.removedScripts : store.scripts;
-const getDataBatchAction = evt => evt.target.closest('[data-batch-action]');
+const searchNeedsCodeIds = computed(
+  () =>
+    state.search.rules.some((rule) => !rule.scope || rule.scope === "code") &&
+    store.scripts.filter((s) => s.$cache.code == null).map((s) => s.props.id),
+);
+const activeTags = computed(() =>
+  state.search.tokens
+    .filter((token) => token.prefix === "#" && !token.negative)
+    .map((token) => token.parsed),
+);
+const getCurrentList = () => (showRecycle.value ? store.removedScripts : store.scripts);
+const getDataBatchAction = (evt) => evt.target.closest("[data-batch-action]");
 const ALL_BATCH_ACTIONS = {
   [TOGGLE]: {
     icon: TOGGLE_ON,
     arg(scripts) {
       const enabled = this.icon === TOGGLE_ON ? 1 : 0;
-      return scripts.filter(s => +s.config.enabled !== enabled);
+      return scripts.filter((s) => +s.config.enabled !== enabled);
     },
-    fn: scripts => Promise.all(scripts.map(handleActionToggle)),
+    fn: (scripts) => Promise.all(scripts.map(handleActionToggle)),
   },
   [UPDATE]: {
-    icon: 'refresh',
+    icon: "refresh",
     fn: handleActionUpdate,
     [UNDO]: false,
   },
   [REMOVE]: {
-    icon: 'trash',
+    icon: "trash",
     async fn(scripts, el, undo) {
-      await Promise.all(scripts.map(s => markRemove(s, !undo)));
+      await Promise.all(scripts.map((s) => markRemove(s, !undo)));
       // nuking the ghosts because the user's intent was already confirmed
       if (!undo) store.scripts = [];
     },
@@ -366,17 +450,17 @@ const batchActions = computed(() => {
   const scripts = state.filteredScripts;
   const num = scripts.length;
   const allShown = num === state.sortedScripts.length;
-  let res = ALL_BATCH_ACTIONS;
+  let res: Record<string, any> = ALL_BATCH_ACTIONS;
   let toEnable = 0;
   let toUpdate = 0;
   for (const s of scripts) {
-    toEnable += !s.config.enabled;
-    if (!allShown) toUpdate += s.$canUpdate > 0;
+    toEnable += Number(!s.config.enabled);
+    if (!allShown) toUpdate += Number((s.$canUpdate || 0) > 0);
   }
   res[TOGGLE].icon = toEnable ? TOGGLE_ON : TOGGLE_OFF;
-  res[TOGGLE].num = toEnable < num ? toEnable : '';
+  res[TOGGLE].num = toEnable < num ? toEnable : "";
   if (!toUpdate) ({ [UPDATE]: toUpdate, ...res } = res);
-  else res[UPDATE].num = toUpdate < num ? toUpdate : '';
+  else res[UPDATE].num = toUpdate < num ? toUpdate : "";
   return res;
 });
 
@@ -385,7 +469,7 @@ const debouncedSearch = debounce(scheduleSearch, 100);
 function resetList() {
   if (!showRecycle.value && store.needRefresh) {
     // Filter removed scripts when reload installed list
-    store.scripts = store.scripts.filter(script => !script.config.removed);
+    store.scripts = store.scripts.filter((script) => !script.config.removed);
     store.needRefresh = false;
   }
   state.focusedIndex = -1;
@@ -405,7 +489,9 @@ function sortScripts(scripts) {
 function onUpdate() {
   const scripts = [...getCurrentList()];
   const rules = state.search.rules;
-  if (rules.length) performSearch(scripts, rules);
+  if (rules.length) {
+    performSearch(scripts as unknown as Parameters<typeof performSearch>[0], rules);
+  }
   sortScripts(scripts);
   state.filteredScripts = rules.length ? scripts.filter(({ $cache }) => $cache.show) : scripts;
   selectScript(state.focusedIndex);
@@ -413,16 +499,16 @@ function onUpdate() {
 }
 async function handleInstallFromURL() {
   try {
-    let url = await showConfirmation(i18n('hintInputURL'), {
-      input: '',
-      ok: { type: 'submit' },
+    let url = await showConfirmation(i18n("hintInputURL"), {
+      input: "",
+      ok: { type: "submit" },
     });
     url = url?.trim();
     if (url) {
-      if (!url.includes('://')) url = `https://${url}`;
+      if (!url.includes("://")) url = `https://${url}`;
       // test if URL is valid
       new URL(url);
-      await sendCmdDirectly('ConfirmInstall', { url });
+      await sendCmdDirectly("ConfirmInstall", { url });
     }
   } catch (err) {
     showMessage({ text: err.message || err });
@@ -436,18 +522,20 @@ async function moveScript(from, to) {
   const aFrom = allScripts.indexOf(script);
   const aTo = allScripts.indexOf(scripts[to]);
   const { id } = script.props;
-  if (await sendCmdDirectly('Move', { id, offset: aTo - aFrom })) {
+  if (await sendCmdDirectly("Move", { id, offset: aTo - aFrom })) {
     allScripts.splice(aFrom, 1);
     allScripts.splice(aTo, 0, script);
-    allScripts.forEach((scr, i) => { scr.props.position = i + 1; });
+    allScripts.forEach((scr, i) => {
+      scr.props.position = i + 1;
+    });
     onUpdate();
   }
 }
 function handleOrderChange(e) {
-  options.set('filters.sort', e.target.value);
+  options.set("filters.sort", e.target.value);
 }
 function handleEditScript(id) {
-  const pathname = [showRecycle.value ? TAB_RECYCLE : SCRIPTS, id]::trueJoin('/');
+  const pathname = trueJoin.call([showRecycle.value ? TAB_RECYCLE : SCRIPTS, id], "/");
   if (!id && pathname === lastRoute().pathname) {
     window.history.back();
   } else {
@@ -456,16 +544,17 @@ function handleEditScript(id) {
 }
 async function onHashChange() {
   const [tab, id, cacheId] = store.route.paths;
-  const newData = id === '_new' && await sendCmdDirectly('NewScript', +cacheId);
-  const script = newData ? newData.script : +id && getCurrentList().find(s => s.props.id === +id);
+  const newData = id === "_new" && (await sendCmdDirectly("NewScript", +cacheId));
+  const script = newData ? newData.script : +id && getCurrentList().find((s) => s.props.id === +id);
   const scrollElem1 = scroller.value;
   const scrollElem2 = document.scrollingElement; // for compact layout
-  if (script && !state.script) { // going into editor
+  if (script && !state.script) {
+    // going into editor
     scrollTop1 = scrollElem1[kScrollTop];
     scrollTop2 = scrollElem2[kScrollTop];
   }
   if (script) {
-    state.code = newData ? newData.code : await sendCmdDirectly('GetScriptCode', id);
+    state.code = newData ? newData.code : await sendCmdDirectly("GetScriptCode", id);
     state.script = script;
     return;
   }
@@ -480,18 +569,22 @@ async function onHashChange() {
   renderScripts();
   if (state.script) {
     state.script = null;
-    nextTick(() => { // scroll position has to be restored explicitly in Chrome and Firefox Android
+    nextTick(() => {
+      // scroll position has to be restored explicitly in Chrome and Firefox Android
       scrollElem1[kScrollTop] = scrollTop1;
       scrollElem2[kScrollTop] = scrollTop2;
     });
   }
 }
 async function renderScripts() {
-  if (!store.canRenderScripts
-  || state.batchRender.limit === RENDER_ALL
-  /* Skip rendering as the editor is being closed right now and we only have 1 script,
+  if (
+    !store.canRenderScripts ||
+    state.batchRender.limit === RENDER_ALL ||
+    /* Skip rendering as the editor is being closed right now and we only have 1 script,
      we'll render in the next call after all scripts data is requested. */
-  || store.title) return;
+    store.title
+  )
+    return;
   const { length } = state.sortedScripts;
   let limit = 9;
   const batchRender = reactive({ limit });
@@ -532,35 +625,36 @@ function scheduleSearch() {
   onUpdate();
 }
 async function getCodeFromStorage(ids) {
-  const data = await sendCmdDirectly('GetScriptCode', ids);
+  const data = await sendCmdDirectly("GetScriptCode", ids);
   store.scripts.forEach(({ $cache, props: { id } }) => {
     if (id in data) $cache.code = data[id];
   });
   onUpdate();
 }
 async function handleEmptyRecycleBin() {
-  if (await showConfirmation(i18n('buttonEmptyRecycleBin'))) {
-    sendCmdDirectly('CheckRemove', { force: true });
+  if (await showConfirmation(i18n("buttonEmptyRecycleBin"))) {
+    sendCmdDirectly("CheckRemove", { force: true });
     store.removedScripts = [];
   }
 }
 function adjustNarrowWidth(val) {
   adjustScriptWidth();
   if (val && !narrowMediaRules) {
-    narrowMediaRules = findStyleSheetRules('-width: 76'); // max-width: 767px, min-width: 768px
+    narrowMediaRules = findStyleSheetRules("-width: 76"); // max-width: 767px, min-width: 768px
     for (const r of narrowMediaRules) r._orig = r.conditionText;
   }
   if (narrowMediaRules) {
     for (const r of narrowMediaRules) {
       const orig = r._orig;
-      r.media.mediaText = val ? orig.replace(/\d+/g, s => +s + 90 / devicePixelRatio) : orig;
+      r.media.mediaText = val ? orig.replace(/\d+/g, (s) => +s + 90 / devicePixelRatio) : orig;
     }
   }
 }
 function adjustScriptWidth() {
   const widths = filters.viewTable ? columnsForTableMode : columnsForCardsMode;
-  state.numColumns = filters.viewSingleColumn ? 1
-    : widths.findIndex(w => window.innerWidth < w) + 1 || widths.length + 1;
+  state.numColumns = filters.viewSingleColumn
+    ? 1
+    : widths.findIndex((w) => window.innerWidth < w) + 1 || widths.length + 1;
 }
 function selectScript(index) {
   index = Math.min(index, state.filteredScripts.length - 1);
@@ -571,26 +665,29 @@ function selectScript(index) {
 }
 function handleActionRemove(script) {
   if (!script.config.removed) {
-    markRemove(script, 1);
+    markRemove(script, true);
   } else {
-    sendCmdDirectly('RemoveScripts', [script.props.id]);
+    sendCmdDirectly("RemoveScripts", [script.props.id]);
   }
 }
 async function handleActionRestore(script) {
   try {
-    await markRemove(script, 0);
+    await markRemove(script, false);
   } catch (err) {
-    showConfirmation(`\
+    showConfirmation(
+      `\
 ${err.message || err}
 
 @namespace ${script.meta.namespace}
-@name ${script.meta.name}`, {
-      cancel: false,
-    });
+@name ${script.meta.name}`,
+      {
+        cancel: false,
+      },
+    );
   }
 }
 function handleActionToggle(script) {
-  return sendCmdDirectly('UpdateScriptInfo', {
+  return sendCmdDirectly("UpdateScriptInfo", {
     id: script.props.id,
     config: {
       enabled: script.config.enabled ? 0 : 1,
@@ -601,22 +698,27 @@ function handleActionToggle(script) {
  * @param {VMScript|VMScript[]} [what]
  * @param {Element} [el]
  */
-async function handleActionUpdate(what, el) {
-  if (el) (el = (el.querySelector('svg') || el.closest('svg') || el).classList).add('rotate');
-  await sendCmdDirectly('CheckUpdate', !!what && {
-    ids: ensureArray(what).map(s => s.props.id),
-    force: what.force,
-  });
-  el?.remove('rotate');
+async function handleActionUpdate(what?, el?) {
+  if (el) (el = (el.querySelector("svg") || el.closest("svg") || el).classList).add("rotate");
+  await sendCmdDirectly(
+    "CheckUpdate",
+    !!what && {
+      ids: ensureArray(what).map((s) => s.props.id),
+      force: what.force,
+    },
+  );
+  el?.remove("rotate");
 }
 function handleClickTag(tag) {
   if (activeTags.value.includes(tag)) {
     // remove tag
-    const tokens = state.search.tokens.filter(token => !(token.prefix === '#' && token.parsed === tag));
-    state.search.value = tokens.map(token => `${token.prefix}${token.raw}`).join(' ');
+    const tokens = state.search.tokens.filter(
+      (token) => !(token.prefix === "#" && token.parsed === tag),
+    );
+    state.search.value = tokens.map((token) => `${token.prefix}${token.raw}`).join(" ");
   } else {
     // add tag
-    state.search.value = [state.search.value.trim(), `#${tag} `].filter(Boolean).join(' ');
+    state.search.value = [state.search.value.trim(), `#${tag} `].filter(Boolean).join(" ");
   }
 }
 function handleSmoothScroll(delta) {
@@ -624,7 +726,7 @@ function handleSmoothScroll(delta) {
   const el = refList.value;
   el.scroll({
     top: el.scrollTop + delta,
-    behavior: 'smooth',
+    behavior: "smooth",
   });
 }
 function handleBatchAction(e) {
@@ -638,49 +740,55 @@ function handleBatchAction(e) {
     const scripts = state.filteredScripts;
     const arg = baVal.arg?.(scripts) || scripts;
     const fn = baVal.fn;
-    const batchArgs = [fn, arg, button];
+    const batchArgs: [any, any, any] = [fn, arg, button];
     if (fn) runInBatch(...batchArgs);
-    stateBA[UNDO] = fn && baVal[UNDO] !== false && (() => {
-      runInBatch(...batchArgs, UNDO);
-      stateBA[UNDO] = null;
-    });
-    action = '';
+    stateBA[UNDO] =
+      fn &&
+      baVal[UNDO] !== false &&
+      (() => {
+        runInBatch(...batchArgs, UNDO);
+        stateBA[UNDO] = null;
+      });
+    action = "";
     button.blur();
   }
   stateBA.action = action;
 }
 function bindKeys() {
   const handleFocus = () => {
-    keyboardService.setContext('buttonFocus', getActiveElement()?.tabIndex >= 0);
+    keyboardService.setContext(
+      "buttonFocus",
+      ((getActiveElement() as HTMLElement | null)?.tabIndex || -1) >= 0,
+    );
   };
-  addEventListener('focus', handleFocus, true);
+  addEventListener("focus", handleFocus, true);
   const disposeList = [
-    () => removeEventListener('focus', handleFocus, true),
-    ...IS_FIREFOX ? [
-      keyboardService.register('tab', () => {
-        handleTabNavigation(1);
-      }),
-      keyboardService.register('s-tab', () => {
-        handleTabNavigation(-1);
-      }),
-    ] : [],
+    () => removeEventListener("focus", handleFocus, true),
+    ...(IS_FIREFOX
+      ? [
+          keyboardService.register("tab", () => {
+            handleTabNavigation(1);
+          }),
+          keyboardService.register("s-tab", () => {
+            handleTabNavigation(-1);
+          }),
+        ]
+      : []),
     ...registerHotkey(() => {
       refSearch.value?.focus();
     }, [
-        ['ctrlcmd-f', conditionAll],
-        ['/', conditionNotSearch, true],
-      ]),
+      ["ctrlcmd-f", conditionAll],
+      ["/", conditionNotSearch, true],
+    ]),
     ...registerHotkey(() => {
       refSearch.value?.blur();
-    }, [
-        ['enter', conditionSearch],
-      ]),
+    }, [["enter", conditionSearch]]),
     ...registerHotkey(() => {
       state.showHotkeys = false;
     }, [
-        ['escape', conditionHotkeys],
-        ['q', conditionHotkeys, true],
-      ]),
+      ["escape", conditionHotkeys],
+      ["q", conditionHotkeys, true],
+    ]),
     ...registerHotkey(() => {
       let index = state.focusedIndex;
       if (index < 0) index = 0;
@@ -689,84 +797,77 @@ function bindKeys() {
         selectScript(index);
       }
     }, [
-        ['ctrlcmd-down', conditionAll],
-        ['down', conditionAll],
-        ['j', conditionNotSearch, true],
-      ]),
+      ["ctrlcmd-down", conditionAll],
+      ["down", conditionAll],
+      ["j", conditionNotSearch, true],
+    ]),
     ...registerHotkey(() => {
       const index = state.focusedIndex - state.numColumns;
       if (index >= 0) {
         selectScript(index);
       }
     }, [
-        ['ctrlcmd-up', conditionAll],
-        ['up', conditionAll],
-        ['k', conditionNotSearch, true],
-      ]),
+      ["ctrlcmd-up", conditionAll],
+      ["up", conditionAll],
+      ["k", conditionNotSearch, true],
+    ]),
     ...registerHotkey(() => {
       selectScript(state.focusedIndex - 1);
     }, [
-        ['ctrlcmd-left', conditionAll],
-        ['left', conditionNotSearch],
-        ['h', conditionNotSearch, true],
-      ]),
+      ["ctrlcmd-left", conditionAll],
+      ["left", conditionNotSearch],
+      ["h", conditionNotSearch, true],
+    ]),
     ...registerHotkey(() => {
       selectScript(state.focusedIndex + 1);
     }, [
-        ['ctrlcmd-right', conditionAll],
-        ['right', conditionNotSearch],
-        ['l', conditionNotSearch, true],
-      ]),
+      ["ctrlcmd-right", conditionAll],
+      ["right", conditionNotSearch],
+      ["l", conditionNotSearch, true],
+    ]),
     ...registerHotkey(() => {
       selectScript(0);
     }, [
-        ['ctrlcmd-home', conditionAll],
-        ['g g', conditionNotSearch, true],
-      ]),
+      ["ctrlcmd-home", conditionAll],
+      ["g g", conditionNotSearch, true],
+    ]),
     ...registerHotkey(() => {
       selectScript(state.filteredScripts.length - 1);
     }, [
-        ['ctrlcmd-end', conditionAll],
-        ['G', conditionNotSearch, true],
-      ]),
+      ["ctrlcmd-end", conditionAll],
+      ["G", conditionNotSearch, true],
+    ]),
     ...registerHotkey(() => {
       handleEditScript(selectedScript.value.props.id);
     }, [
-        [scriptHotkeys[EDIT], conditionScriptFocused, true],
-        // Enter should only work when no button is focused
-        ['enter', conditionScriptFocusedWithoutButton],
-      ]),
+      [scriptHotkeys[EDIT], conditionScriptFocused, true],
+      // Enter should only work when no button is focused
+      ["enter", conditionScriptFocusedWithoutButton],
+    ]),
     ...registerHotkey(() => {
       handleActionRemove(selectedScript.value);
     }, [
-        ['delete', conditionScriptFocused],
-        [scriptHotkeys[REMOVE], conditionScriptFocused, true],
-      ]),
+      ["delete", conditionScriptFocused],
+      [scriptHotkeys[REMOVE], conditionScriptFocused, true],
+    ]),
     ...registerHotkey(() => {
       handleActionUpdate(selectedScript.value);
-    }, [
-        [scriptHotkeys[UPDATE], conditionScriptFocused, true],
-      ]),
+    }, [[scriptHotkeys[UPDATE], conditionScriptFocused, true]]),
     ...registerHotkey(() => {
       handleActionToggle(selectedScript.value);
-    }, [
-        [scriptHotkeys[TOGGLE], conditionScriptFocused, true],
-      ]),
+    }, [[scriptHotkeys[TOGGLE], conditionScriptFocused, true]]),
     ...registerHotkey(() => {
       handleActionRestore(selectedScript.value);
-    }, [
-        [scriptHotkeys[RESTORE], conditionScriptFocusedRecycle, true],
-      ]),
+    }, [[scriptHotkeys[RESTORE], conditionScriptFocusedRecycle, true]]),
     ...registerHotkey(() => {
       state.showHotkeys = !state.showHotkeys;
-    }, [
-        ['?', conditionNotSearch, true],
-      ]),
+    }, [["?", conditionNotSearch, true]]),
   ];
 
-  return () => disposeList.forEach(dispose => {
-    dispose();
-  });
+  return () =>
+    disposeList.forEach((dispose) => {
+      dispose();
+    });
 }
 
 function handleCancelBatchAction(e) {
@@ -777,8 +878,10 @@ function handleCancelBatchAction(e) {
 
 resetList();
 watch(showRecycle, resetList);
-watch(() => store.canRenderScripts && refList.value && draggableRaw.value,
-  dr => toggleDragging(refList.value, moveScript, dr));
+watch(
+  () => store.canRenderScripts && refList.value && draggableRaw.value,
+  (dr) => toggleDragging(refList.value, moveScript, dr),
+);
 watch(() => state.search.value, debouncedSearch);
 watch(() => [filters.sort, filters.showEnabledFirst], scheduleSearch);
 if (screen.availWidth > 767) {
@@ -787,35 +890,45 @@ if (screen.availWidth > 767) {
 }
 watch(getCurrentList, refreshUI);
 watch(() => store.route.paths[1], onHashChange);
-watch(() => store.scripts, val => {
-  if ((isEmpty.value = !val.length) && (val = $menuNew.value)) {
-    val.focus(); // for Tab navigation and focus highlight
-    val.click();
-  }
-});
-watch(selectedScript, script => {
-  keyboardService.setContext('selectedScript', script);
-});
-watch(() => state.showHotkeys, value => {
-  keyboardService.setContext('showHotkeys', value);
-});
-watch(() => state.filteredScripts, value => {
-  const totals = Array(SIZE_TITLES.length).fill(0);
-  for (const script of value) {
-    for (let i = 0; i < totals.length; i++) {
-      totals[i] += script.$cache.sizesNum[i];
+watch(
+  () => store.scripts,
+  (val) => {
+    const menuNew = $menuNew.value as HTMLElement | null;
+    if ((isEmpty.value = !val.length) && menuNew) {
+      menuNew.focus(); // for Tab navigation and focus highlight
+      menuNew.click();
     }
-  }
-  let sum = 0;
-  let str = '';
-  totals.forEach((val, i) => {
-    sum += val;
-    if (val) str += `${SIZE_TITLES[i]}: ${formatByteLength(val)}\n`;
-  });
-  // `null` removes the attribute to disable the ::after CSS rule
-  state.size = sum ? formatByteLength(sum).replace(' ', '') : null;
-  state.sizes = sum ? formatSizesStr(str) : '';
+  },
+);
+watch(selectedScript, (script) => {
+  keyboardService.setContext("selectedScript", script);
 });
+watch(
+  () => state.showHotkeys,
+  (value) => {
+    keyboardService.setContext("showHotkeys", value);
+  },
+);
+watch(
+  () => state.filteredScripts,
+  (value) => {
+    const totals = Array(SIZE_TITLES.length).fill(0);
+    for (const script of value) {
+      for (let i = 0; i < totals.length; i++) {
+        totals[i] += script.$cache.sizesNum[i];
+      }
+    }
+    let sum = 0;
+    let str = "";
+    totals.forEach((val, i) => {
+      sum += val;
+      if (val) str += `${SIZE_TITLES[i]}: ${formatByteLength(val)}\n`;
+    });
+    // `null` removes the attribute to disable the ::after CSS rule
+    state.size = sum ? formatByteLength(sum).replace(" ", "") : null;
+    state.sizes = sum ? formatSizesStr(str) : "";
+  },
+);
 
 const disposables = [];
 
@@ -828,7 +941,7 @@ Object.assign(handlers, {
         if (val) dirty = scr[INFERRED].visit = val;
       }
     }
-    if (dirty && filters.sort.startsWith('visit')) {
+    if (dirty && filters.sort.startsWith("visit")) {
       sortScripts([...getCurrentList()]);
     }
   },
@@ -841,36 +954,38 @@ onMounted(() => {
   if (store.loaded) refreshUI();
   // Extract --columns-cards and --columns-table from `:root` or `html` selector. CustomCSS may override it.
   if (!columnsForCardsMode.length) {
-    const style = customCssElem?.textContent.match(/--columns-(cards|table)\b/)
-      && getComputedStyle(document.documentElement);
+    const style =
+      customCssElem?.textContent.match(/--columns-(cards|table)\b/) &&
+      getComputedStyle(document.documentElement);
     if (style) {
       for (const [type, arr] of [
-        ['cards', columnsForCardsMode],
-        ['table', columnsForTableMode],
-      ]) {
+        ["cards", columnsForCardsMode],
+        ["table", columnsForTableMode],
+      ] as const) {
         const val = style.getPropertyValue(`--columns-${type}`);
-        if (val) arr.push(...val.split(',').map(Number).filter(Boolean));
+        if (val) arr.push(...val.split(",").map(Number).filter(Boolean));
       }
     } else {
       columnsForCardsMode.push(1300, 1900, 2500); // 1366x768, 1920x1080, 2560x1440
       columnsForTableMode.push(1600, 2500, 3400); // 1680x1050, 2560x1440, 3440x1440
     }
-    addEventListener('resize', adjustScriptWidth);
+    addEventListener("resize", adjustScriptWidth);
   }
   adjustScriptWidth();
   disposables.push(bindKeys());
 
-  document.addEventListener('mousedown', handleCancelBatchAction);
-  disposables.push(() => document.removeEventListener('mousedown', handleCancelBatchAction));
+  document.addEventListener("mousedown", handleCancelBatchAction);
+  disposables.push(() => document.removeEventListener("mousedown", handleCancelBatchAction));
 });
 
 onBeforeUnmount(() => {
-  disposables.forEach(dispose => dispose());
+  disposables.forEach((dispose) => dispose());
 });
 </script>
 
 <style>
-$iconSize: 2rem; // from .icon in ui/style.css
+$iconSize: 2rem;
+// from .icon in ui/style.css
 .tab.tab-installed {
   height: 100vh;
   padding: 0;
@@ -884,14 +999,16 @@ $iconSize: 2rem; // from .icon in ui/style.css
     align-items: center;
     line-height: 1;
     border-bottom: 1px solid var(--fill-5);
-    .btn-ghost, select {
+    .btn-ghost,
+    select {
       height: $iconSize;
     }
   }
   .vl-dropdown-menu {
     white-space: nowrap;
   }
-  @media (max-width: 550px) { // same size as `hidden-sm` in @/common/ui/style/style.css
+  @media (max-width: 550px) {
+    // same size as `hidden-sm` in @/common/ui/style/style.css
     /* The header bar must be set to scrollable and the dropdown fixed simultaneously. */
     header {
       overflow-x: auto;
@@ -920,18 +1037,18 @@ $iconSize: 2rem; // from .icon in ui/style.css
   font-size: 2rem;
 }
 .backdrop::after {
-  content: ' ';
+  content: " ";
   width: 0;
   height: 100%;
 }
 .mask {
-  background: rgba(0,0,0,.08);
+  background: rgba(0, 0, 0, 0.08);
   /*transition: opacity 1s;*/
 }
 .dropdown-menu-item {
   display: block;
   width: 100%;
-  padding: .5rem;
+  padding: 0.5rem;
   text-decoration: none;
   color: var(--fill-9);
   cursor: pointer;
@@ -950,12 +1067,12 @@ $iconSize: 2rem; // from .icon in ui/style.css
     position: absolute;
     height: 100%;
     top: 0;
-    right: .5rem;
+    right: 0.5rem;
   }
   input {
     width: 100%;
     height: 2rem;
-    padding-left: .5rem;
+    padding-left: 0.5rem;
     padding-right: 2rem;
   }
   &-tooltip {
@@ -970,7 +1087,7 @@ $iconSize: 2rem; // from .icon in ui/style.css
   .vl-dropdown-menu {
     padding: 1rem;
     > :nth-last-child(n + 2) {
-      margin-bottom: .5rem;
+      margin-bottom: 0.5rem;
     }
   }
 }
@@ -1004,7 +1121,7 @@ $iconSize: 2rem; // from .icon in ui/style.css
   }
 }
 [data-size]::after {
-  content: ' (' attr(data-size) ')';
+  content: " (" attr(data-size) ")";
 }
 .rotate {
   animation: 4s linear infinite rotate;

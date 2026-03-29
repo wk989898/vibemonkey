@@ -11,18 +11,22 @@
     }"
     :tabIndex
     @focus="setScriptFocus(true)"
-    @blur="setScriptFocus(false)">
+    @blur="setScriptFocus(false)"
+  >
     <div class="script-icon hidden-xs">
       <a :href="url" :data-hotkey="hotkeys.edit" data-hotkey-table tabIndex="-1">
-        <img :src="script.safeIcon" :data-no-icon="script.noIcon">
+        <img :src="script.safeIcon" :data-no-icon="script.noIcon" />
       </a>
     </div>
     <!-- We disable native dragging on name to avoid confusion with exec re-ordering.
     Users who want to open a new tab via dragging the link can drag the icon. -->
     <div class="script-info-1 ellipsis">
-      <a v-text="script.$cache.name" v-bind="viewTable && { draggable: false, href: url, tabIndex }"
-         :data-order="isRemoved ? null : script.props.position"
-         class="script-name ellipsis" />
+      <a
+        v-text="script.$cache.name"
+        v-bind="viewTable && { draggable: false, href: url, tabIndex }"
+        :data-order="isRemoved ? null : script.props.position"
+        class="script-name ellipsis"
+      />
       <div class="script-tags" v-if="canRender">
         <a
           v-for="(item, i) in tags.slice(0, 2)"
@@ -50,9 +54,12 @@
     </div>
     <div class="script-info flex ml-1c">
       <template v-if="canRender">
-        <tooltip v-if="author" :content="i18n('labelAuthor') + script.meta.author"
-                 class="script-author ml-1c hidden-sm"
-                 align="end">
+        <tooltip
+          v-if="author"
+          :content="i18n('labelAuthor') + script.meta.author"
+          class="script-author ml-1c hidden-sm"
+          align="end"
+        >
           <icon name="author" />
           <a
             v-if="author.email"
@@ -63,9 +70,8 @@
           />
           <span class="ellipsis" v-else v-text="author.name" />
         </tooltip>
-        <span class="version ellipsis" v-text="script.meta.version"/>
-        <tooltip class="visit hidden-sm ml-1c" :content="visit.title" align="end"
-                 v-if="showVisit">
+        <span class="version ellipsis" v-text="script.meta.version" />
+        <tooltip class="visit hidden-sm ml-1c" :content="visit.title" align="end" v-if="showVisit">
           {{ visit.show }}
         </tooltip>
         <tooltip class="size hidden-sm" :content="script.$cache.sizes" align="end">
@@ -85,12 +91,8 @@
         </tooltip>
         <template v-if="!isRemoved">
           <tooltip :content="labelEnable" align="start">
-            <a
-              class="btn-ghost"
-              @click="onToggle"
-              :data-hotkey="hotkeys.toggle"
-              :tabIndex>
-              <icon :name="isEnabled ? TOGGLE_ON : TOGGLE_OFF"/>
+            <a class="btn-ghost" @click="onToggle" :data-hotkey="hotkeys.toggle" :tabIndex>
+              <icon :name="isEnabled ? TOGGLE_ON : TOGGLE_OFF" />
             </a>
           </tooltip>
           <tooltip
@@ -98,50 +100,68 @@
             :content="i18n('updateScript') + ' | ' + i18nUpdateScriptForced"
             :title="!canUpdate && canUpdateDeps ? i18nUpdateScriptForced : null"
             v-on="{ contextmenu: (canUpdate || canUpdateDeps) && !script.checking && onUpdate }"
-            align="start">
+            align="start"
+          >
             <a
               class="btn-ghost"
               @click="onUpdate"
               :data-hotkey="hotkeys.update"
-              :tabIndex="canUpdate ? tabIndex : -1">
+              :tabIndex="canUpdate ? tabIndex : -1"
+            >
               <icon name="refresh" :invert.attr="canUpdate === -1 ? '' : null" />
             </a>
           </tooltip>
         </template>
         <span class="sep"></span>
         <tooltip :disabled="!description" :content="description" align="start">
-          <a class="btn-ghost" :tabIndex="description ? tabIndex : -1" @click="toggleTip($event.target)">
+          <a
+            class="btn-ghost"
+            :tabIndex="description ? tabIndex : -1"
+            @click="toggleTip($event.target)"
+          >
             <icon name="info"></icon>
           </a>
         </tooltip>
-        <tooltip v-for="([title, url], icon) in urls" :key="icon"
-                 :disabled="!url" :content="title" align="start">
+        <tooltip
+          v-for="([title, url], icon) in urls"
+          :key="icon"
+          :disabled="!url"
+          :content="title"
+          align="start"
+        >
           <a
             class="btn-ghost"
             v-bind="EXTERNAL_LINK_PROPS"
             :href="url"
-            :tabIndex="url ? tabIndex : -1">
-            <icon :name="icon"/>
+            :tabIndex="url ? tabIndex : -1"
+          >
+            <icon :name="icon" />
           </a>
         </tooltip>
         <!-- Using v-if to actually hide it because FF is slow to apply :not(:empty) CSS -->
-        <div class="script-message" v-if="script.message" v-text="script.message"
-             :title="script.error"/>
+        <div
+          class="script-message"
+          v-if="script.message"
+          v-text="script.message"
+          :title="script.error"
+        />
       </template>
     </div>
     <div class="script-buttons script-buttons-right">
       <template v-if="canRender">
         <tooltip :content="i18n('buttonRemove')" align="end" v-if="showRecycle || !isRemoved">
-          <a class="btn-ghost" :class="{ 'btn-danger': isRemoved }" @click="onRemove" :data-hotkey="hotkeys.remove" :tabIndex>
+          <a
+            class="btn-ghost"
+            :class="{ 'btn-danger': isRemoved }"
+            @click="onRemove"
+            :data-hotkey="hotkeys.remove"
+            :tabIndex
+          >
             <icon name="trash"></icon>
           </a>
         </tooltip>
         <tooltip :content="i18n('buttonRestore')" placement="left" v-if="isRemoved">
-          <a
-            class="btn-ghost"
-            @click="onRestore"
-            :data-hotkey="hotkeys.restore"
-            :tabIndex>
+          <a class="btn-ghost" @click="onRestore" :data-hotkey="hotkeys.restore" :tabIndex>
             <icon name="undo"></icon>
           </a>
         </tooltip>
@@ -150,46 +170,41 @@
   </div>
 </template>
 
-<script>
-import { formatTime, getLocaleString, getScriptHome, getScriptSupportUrl, i18n } from '@/common';
-import { INFERRED } from '@/common/consts';
-import { EXTERNAL_LINK_PROPS, getActiveElement, showConfirmation } from '@/common/ui';
-import { isInput, keyboardService, toggleTip } from '@/common/keyboard';
-import { kDescription, store, TOGGLE_OFF, TOGGLE_ON } from '../utils';
+<script lang="ts">
+import { formatTime, getLocaleString, getScriptHome, getScriptSupportUrl, i18n } from "@/common";
+import { INFERRED } from "@/common/consts";
+import { EXTERNAL_LINK_PROPS, getActiveElement, showConfirmation } from "@/common/ui";
+import { isInput, keyboardService, toggleTip } from "@/common/keyboard";
+import { kDescription, store, TOGGLE_OFF, TOGGLE_ON } from "../utils";
 
 const itemMargin = 8;
-const i18nUpdateScriptForced = i18n('updateScriptForced');
+const i18nUpdateScriptForced = i18n("updateScriptForced");
 const visitedRecently = new Set();
-const refreshVisited = () => { store.now = Date.now(); };
+const refreshVisited = () => {
+  store.now = Date.now();
+};
 const scheduleRefreshVisited = () => setInterval(refreshVisited, 60e3);
-const setScriptFocus = val => keyboardService.setContext('scriptFocus', val);
-let visitedRecentlyInterval;
+const setScriptFocus = (val) => keyboardService.setContext("scriptFocus", val);
+let visitedRecentlyInterval: ReturnType<typeof setInterval> | undefined;
 </script>
 
-<script setup>
-import Dropdown from 'vueleton/lib/dropdown';
-import Tooltip from 'vueleton/lib/tooltip';
-import Icon from '@/common/ui/icon';
-import { computed, ref, watch } from 'vue';
+<script setup lang="ts">
+import Dropdown from "vueleton/lib/dropdown";
+import Tooltip from "vueleton/lib/tooltip";
+import Icon from "@/common/ui/icon.vue";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps([
-  'script',
-  'visible',
-  'viewTable',
-  'focused',
-  'hotkeys',
-  'showHotkeys',
-  'showVisit',
-  'activeTags',
+  "script",
+  "visible",
+  "viewTable",
+  "focused",
+  "hotkeys",
+  "showHotkeys",
+  "showVisit",
+  "activeTags",
 ]);
-const emit = defineEmits([
-  'clickTag',
-  'remove',
-  'restore',
-  'scrollDelta',
-  'toggle',
-  'update',
-]);
+const emit = defineEmits(["clickTag", "remove", "restore", "scrollDelta", "toggle", "update"]);
 const $root = ref();
 const canRender = ref(props.visible);
 const isEnabled = computed(() => props.script.config.enabled);
@@ -208,59 +223,66 @@ const canUpdate = computed(() => props.script.$canUpdate);
 const notDataUrlRe = /^(?!data:)/;
 const canUpdateDeps = computed(() => {
   const { meta } = props.script;
-  return meta.require.some(notDataUrlRe.test, notDataUrlRe)
-    || Object.values(meta.resources).some(notDataUrlRe.test, notDataUrlRe);
+  return (
+    meta.require.some(notDataUrlRe.test, notDataUrlRe) ||
+    Object.values(meta.resources).some(notDataUrlRe.test, notDataUrlRe)
+  );
 });
 const description = computed(() => {
   return props.script.custom[kDescription] || getLocaleString(props.script.meta, kDescription);
 });
 const labelEnable = computed(() => {
-  return isEnabled.value ? i18n('buttonDisable') : i18n('buttonEnable');
+  return isEnabled.value ? i18n("buttonDisable") : i18n("buttonEnable");
 });
 const tabIndex = computed(() => {
   return props.focused ? 0 : -1;
 });
 const tags = computed(() => {
-  return props.script.custom.tags?.split(' ').filter(Boolean) || [];
+  return props.script.custom.tags?.split(" ").filter(Boolean) || [];
 });
 const updatedAt = computed(() => {
   const { props: scrProps } = props.script;
-  const lastModified = !isRemoved.value && scrProps.lastUpdated || scrProps.lastModified;
+  const lastModified = (!isRemoved.value && scrProps.lastUpdated) || scrProps.lastModified;
   const dateStr = lastModified && new Date(lastModified).toLocaleString();
-  return lastModified ? {
-    show: formatDynamicTime(scrProps, lastModified),
-    title: isRemoved.value
-      ? i18n('labelRemovedAt', dateStr)
-      : i18n('labelLastUpdatedAt', dateStr)
-  } : {};
+  return lastModified
+    ? {
+        show: formatDynamicTime(scrProps, lastModified),
+        title: isRemoved.value
+          ? i18n("labelRemovedAt", dateStr)
+          : i18n("labelLastUpdatedAt", dateStr),
+      }
+    : {};
 });
 const visit = computed(() => {
   const { script } = props;
   const time = script[INFERRED].visit;
-  return time && props.showVisit ? {
-    show: formatDynamicTime(script.props, time),
-    title: new Date(time).toLocaleString() + '. ' + i18n('filterLastVisitOrderTooltip'),
-  } : {};
+  return time && props.showVisit
+    ? {
+        show: formatDynamicTime(script.props, time),
+        title: new Date(time).toLocaleString() + ". " + i18n("filterLastVisitOrderTooltip"),
+      }
+    : {};
 });
-const url = computed(() => `#${
-  isRemoved.value ? TAB_RECYCLE : SCRIPTS}/${props.script.props.id}
-`);
+const url = computed(
+  () => `#${isRemoved.value ? TAB_RECYCLE : SCRIPTS}/${props.script.props.id}
+`,
+);
 const urls = computed(() => ({
-  home: [i18n('buttonHome'), getScriptHome(props.script)],
-  question: [i18n('buttonSupport'), getScriptSupportUrl(props.script)],
+  home: [i18n("buttonHome"), getScriptHome(props.script)],
+  question: [i18n("buttonSupport"), getScriptSupportUrl(props.script)],
 }));
 
-const emitScript = event => emit(event, props.script);
-const onRemove = () => emitScript('remove');
-const onRestore = () => emitScript('restore');
-const onTagClick = item => emit('clickTag', item);
-const onToggle = () => emitScript('toggle');
-const onUpdate = async evt => {
+const emitScript = (event) => emit(event, props.script);
+const onRemove = () => emitScript("remove");
+const onRestore = () => emitScript("restore");
+const onTagClick = (item) => emit("clickTag", item);
+const onToggle = () => emitScript("toggle");
+const onUpdate = async (evt) => {
   evt.preventDefault(); // for contextmenu
-  if (props.script.$canUpdate !== -1
-  || await showConfirmation(i18n('confirmManualUpdate'))) {
-    (evt = [props.script]).force = evt.type !== 'click';
-    emit('update', evt);
+  if (props.script.$canUpdate !== -1 || (await showConfirmation(i18n("confirmManualUpdate")))) {
+    const payload = [props.script] as [typeof props.script] & { force?: boolean };
+    payload.force = evt.type !== "click";
+    emit("update", payload);
   }
 };
 /**
@@ -276,35 +298,46 @@ function formatDynamicTime({ id }, time) {
   } else {
     visitedRecently.delete(id);
     if (visitedRecentlyInterval && !visitedRecently.size) {
-      visitedRecentlyInterval = clearInterval(refreshVisited);
+      clearInterval(visitedRecentlyInterval);
+      visitedRecentlyInterval = undefined;
     }
   }
   return formatTime(time);
 }
 
-watch(() => props.visible, visible => {
-  // Leave it if the element is already rendered
-  if (visible) canRender.value = true;
-});
+watch(
+  () => props.visible,
+  (visible) => {
+    // Leave it if the element is already rendered
+    if (visible) canRender.value = true;
+  },
+);
 
-watch(() => props.focused, (value, prevValue) => {
-  const $el = $root.value;
-  if (value && !prevValue && $el) {
-    const rect = $el.getBoundingClientRect();
-    const pRect = $el.parentNode.getBoundingClientRect();
-    let delta = 0;
-    if (rect.bottom > pRect.bottom - itemMargin) {
-      delta += rect.bottom - pRect.bottom + itemMargin;
-    } else if (rect.top < pRect.top + itemMargin) {
-      delta -= pRect.top - rect.top + itemMargin;
+watch(
+  () => props.focused,
+  (value, prevValue) => {
+    const $el = $root.value;
+    if (value && !prevValue && $el) {
+      const parent = $el.parentNode as HTMLElement | null;
+      let delta = 0;
+      if (parent) {
+        const top = $el.offsetTop - parent.scrollTop;
+        const bottom = top + $el.offsetHeight;
+        const lowerBound = parent.clientHeight - itemMargin;
+        if (bottom > lowerBound) {
+          delta += bottom - lowerBound;
+        } else if (top < itemMargin) {
+          delta -= itemMargin - top;
+        }
+      }
+      if (!isInput(getActiveElement())) {
+        // focus without scrolling, then scroll smoothly
+        $el.focus({ preventScroll: true });
+      }
+      emit("scrollDelta", delta);
     }
-    if (!isInput(getActiveElement())) {
-      // focus without scrolling, then scroll smoothly
-      $el.focus({ preventScroll: true });
-    }
-    emit('scrollDelta', delta);
-  }
-});
+  },
+);
 </script>
 
 <style>

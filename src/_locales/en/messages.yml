@@ -241,7 +241,7 @@ extDescription:
   message: An open source userscript manager that supports a lot of browsers
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Blacklisted in Violentmonkey's settings

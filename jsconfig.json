@@ -1,13 +1,3 @@
 {
-  "compilerOptions": {
-    "baseUrl": ".",
-    "jsx": "preserve",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "typeAcquisition": {
-    "include": ["./types.d.ts"]
-  },
-  "exclude": ["node_modules", "dist"]
+  "extends": "./tsconfig.json"
 }

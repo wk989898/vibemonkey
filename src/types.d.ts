@@ -1,10 +1,9 @@
-/* tslint:disable:no-namespace */
 //#region Generic
 
-declare type NumBool = 0 | 1
+declare type NumBool = 0 | 1;
 /** null means "default" or "inherit from global" */
-declare type NumBoolNull = 0 | 1 | null
-declare type StringMap = { [key: string]: string }
+declare type NumBoolNull = 0 | 1 | null;
+declare type StringMap = { [key: string]: string };
 declare type PlainJSONValue = browser.extensionTypes.PlainJSONValue;
 
 type DeepPartial<T> = {
@@ -13,6 +12,121 @@ type DeepPartial<T> = {
 
 //#endregion Generic
 //#region GM-specific
+
+declare const unsafeWindow: Window;
+
+declare type VMScriptRunAt = "document-start" | "document-body" | "document-end" | "document-idle";
+
+declare type VMScriptInjectInto = "auto" | "page" | "content";
+
+declare interface VMScriptGMInfoPlatform {
+  arch?: string;
+  browserName?: string;
+  browserVersion?: string;
+  fullVersionList?: { brand: string; version: string }[];
+  mobile?: boolean;
+  os?: string;
+}
+
+declare interface VMScriptGMInfoScriptMeta {
+  antifeature?: string[];
+  author?: string;
+  compatible?: string[];
+  connect?: string[];
+  description: string;
+  downloadURL?: string;
+  excludeMatches: string[];
+  excludes: string[];
+  grant: string[];
+  homepage?: string;
+  homepageURL?: string;
+  icon?: string;
+  includes: string[];
+  matches: string[];
+  name: string;
+  namespace: string;
+  noframes?: boolean;
+  options: {
+    check_for_updates?: boolean;
+    inject_into?: VMScriptInjectInto | null;
+    noframes?: boolean | null;
+    override?: Record<string, unknown>;
+    run_at?: VMScriptRunAt | null;
+    tags?: string[];
+    user_modified?: number;
+  };
+  require: string[];
+  resources: { name: string; url: string }[];
+  runAt: VMScriptRunAt | "";
+  supportURL?: string;
+  unwrap?: boolean;
+  updateURL?: string;
+  version: string;
+}
+
+declare interface VMScriptGMInfoObject {
+  injectInto: VMScriptInjectInto;
+  isIncognito: boolean;
+  platform: VMScriptGMInfoPlatform;
+  script: VMScriptGMInfoScriptMeta;
+  scriptHandler: string;
+  scriptMetaStr: string;
+  scriptWillUpdate: boolean;
+  userAgent: string;
+  userAgentData?: {
+    brands: { brand: string; version: string }[];
+    mobile: boolean;
+    platform: string;
+    getHighEntropyValues(hints: string[]): Promise<Record<string, unknown>>;
+  };
+  uuid: string;
+  version: string;
+}
+
+declare interface VMScriptResponseObject<T = unknown> {
+  context?: unknown;
+  finalUrl?: string;
+  lengthComputable?: boolean;
+  loaded?: number;
+  readyState?: number;
+  response?: T;
+  responseHeaders?: string;
+  responseText?: string;
+  responseXML?: Document | null;
+  status?: number;
+  statusText?: string;
+  total?: number;
+}
+
+declare type VMScriptGMResponseHandler<T = unknown> = (resp: VMScriptResponseObject<T>) => void;
+
+declare interface VMScriptGMXHRDetails<T = unknown> {
+  anonymous?: boolean;
+  binary?: boolean;
+  context?: unknown;
+  data?: BodyInit | Document | XMLHttpRequestBodyInit | null;
+  headers?: Record<string, string>;
+  method?: string;
+  onabort?: VMScriptGMResponseHandler<T>;
+  onerror?: VMScriptGMResponseHandler<T>;
+  onload?: VMScriptGMResponseHandler<T>;
+  onloadend?: VMScriptGMResponseHandler<T>;
+  onloadstart?: VMScriptGMResponseHandler<T>;
+  onprogress?: VMScriptGMResponseHandler<T>;
+  onreadystatechange?: VMScriptGMResponseHandler<T>;
+  ontimeout?: VMScriptGMResponseHandler<T>;
+  overrideMimeType?: string;
+  password?: string;
+  responseType?: XMLHttpRequestResponseType;
+  timeout?: number;
+  url: string;
+  user?: string;
+}
+
+declare interface VMScriptGMDownloadOptions extends VMScriptGMXHRDetails<Blob> {
+  name?: string;
+  saveAs?: boolean;
+}
 
 /**
  * Script context object used by GM### API
@@ -38,7 +152,7 @@ declare namespace GMReq {
     /** use browser's `Cookie` header */
     cookie?: boolean;
     /** allow Set-Cookie header to affect browser */
-    'set-cookie'?: boolean;
+    "set-cookie"?: boolean;
     coreId: number;
     /** Firefox-only workaround for CSP blocking a blob: URL */
     fileName: string;
@@ -90,7 +204,7 @@ declare namespace GMReq {
     }
     interface BGError {
       id: string;
-      type: 'error';
+      type: "error";
       data: null; // helps avoid the need for hasOwnProperty in HttpRequested
       error: string;
     }
@@ -117,12 +231,12 @@ declare namespace GMReq {
   }
 }
 
-declare type VMBridgeMode = Exclude<VMScriptInjectInto, 'auto'>;
+declare type VMBridgeMode = Exclude<VMScriptInjectInto, "auto">;
 
 declare type VMBridgeContentIds = {
   /** -1 = bad realm, 0 = disabled, 1 = enabled, 2 = starting, context name = running */
   [id: string]: -1 | 0 | 1 | 2 | VMBridgeMode;
-}
+};
 
 declare type VMBridgePostFunc = (
   cmd: string,
@@ -134,7 +248,7 @@ declare type VMBridgePostFunc = (
 //#endregion Generic
 //#region VM-specific
 
-declare type VMBadgeMode = 'unique' | 'total' | ''
+declare type VMBadgeMode = "unique" | "total" | "";
 
 declare type VMBadgeData = {
   /** Map: frameId -> number of scripts in this frame */
@@ -153,12 +267,15 @@ declare type VMBadgeData = {
   inject: boolean | string;
   total: number;
   unique: number;
-}
+};
 
 /**
  * Internal script representation
  */
 declare interface VMScript {
+  $cache?: Record<string, any>;
+  $canUpdate?: number;
+  checking?: boolean;
   config: {
     enabled: NumBool;
     removed: NumBool;
@@ -211,6 +328,7 @@ declare interface VMScript {
     supportURL?: string;
     topLevelAwait?: boolean;
     unwrap?: boolean;
+    updateURL?: string;
     version?: string;
   };
   props: {
@@ -226,10 +344,19 @@ declare interface VMScript {
     homepageURL?: string;
     supportURL?: string;
     visit: number;
-  },
+  };
+  failed?: boolean;
+  grantless?: string;
+  message?: string;
+  more?: boolean;
+  noIcon?: string | null;
+  pageUrl?: string;
+  runs?: boolean;
+  safeIcon?: string | null;
+  syntax?: boolean;
 }
 
-declare interface VMScriptSourceOptions extends DeepPartial<Omit<VMScript, 'inferred'>> {
+declare interface VMScriptSourceOptions extends DeepPartial<Omit<VMScript, "inferred">> {
   code?: string;
 
   id?: number;
@@ -272,7 +399,7 @@ declare interface VMInjection extends VMInjectionDisabled, VMInjectionFlags {
   /** content bridge adds the actually running ids and sends via SetPopup */
   ids: number[];
   info: VMInjection.Info;
-  injectInto: VMScriptInjectInto | 'SkipScripts';
+  injectInto: VMScriptInjectInto | "SkipScripts";
   /** cache key for envDelayed, which also tells content bridge to expect envDelayed */
   more: string;
   nonce?: string;
@@ -286,7 +413,7 @@ declare interface VMInjection extends VMInjectionDisabled, VMInjectionFlags {
  * Injection paraphernalia in the background script
  */
 declare namespace VMInjection {
-  type RunAt = 'start' | 'body' | 'end' | 'idle';
+  type RunAt = "start" | "body" | "end" | "idle";
   interface Env {
     cache: StringMap;
     cacheKeys: string[];
@@ -337,13 +464,13 @@ declare namespace VMInjection {
     /** -1 ID_BAD_REALM if the desired realm is PAGE which is not injectable */
     code: string | -1;
     /** Omitted props are added in makeGmApiWrapper */
-    gmi: Omit<VMScriptGMInfoObject, 'injectInto' | 'resources' | 'script' | 'scriptMetaStr'>;
+    gmi: Omit<VMScriptGMInfoObject, "injectInto" | "resources" | "script" | "scriptMetaStr">;
     id: number;
     injectInto: VMScriptInjectInto;
-    key: { data: string, win: string };
+    key: { data: string; win: string };
     /** `resources` is still an object, converted later in makeGmApiWrapper */
-    meta: VMScript['meta'] | VMScriptGMInfoScriptMeta;
-    metaStr: (string|number)[];
+    meta: VMScript["meta"] | VMScriptGMInfoScriptMeta;
+    metaStr: (string | number)[];
     pathMap: StringMap;
     runAt?: RunAt;
     values?: StringMap;
@@ -356,7 +483,7 @@ declare interface VMRealmData {
     body: VMScript[];
     end: VMScript[];
     idle: VMScript[];
-  }
+  };
   is: boolean;
   info: VMInjection.Info;
 }
@@ -367,11 +494,11 @@ declare interface VMRealmData {
 declare namespace VMReq {
   interface Options extends RequestInit {
     /** @implements XMLHttpRequestResponseType */
-    responseType?: '' | 'arraybuffer' | 'blob' | 'json' | 'text';
+    responseType?: "" | "arraybuffer" | "blob" | "json" | "text";
   }
   interface OptionsMulti extends Options {
     /** truthy = multi script update, 'auto' = autoUpdate, falsy = single */
-    multi?: boolean | 'auto';
+    multi?: boolean | "auto";
   }
   type Response = {
     url: string;
@@ -390,22 +517,42 @@ declare type VMSearchOptions = {
   reversed?: boolean;
   wrapAround?: boolean;
   reuseCursor?: boolean;
-  pos?: { line: number, ch: number };
+  pos?: { line: number; ch: number };
+};
+
+declare type VMSearchRuleScope = "" | "name" | "code" | "desc" | "tags";
+
+declare interface VMSearchToken {
+  negative: boolean;
+  prefix: string;
+  raw: string;
+  parsed: string;
+}
+
+declare interface VMSearchRule {
+  negative: boolean;
+  scope: VMSearchRuleScope;
+  re: RegExp;
+}
+
+declare interface VMSearchRuleset {
+  tokens: VMSearchToken[];
+  rules: VMSearchRule[];
 }
 
 /** Throws on error */
 declare type VMStorageFetch = (
   url: string,
   /** 'res' makes the function resolve with the result */
-  options?: VMReq.Options | 'res',
-) => Promise<void>
+  options?: VMReq.Options | "res",
+) => Promise<void>;
 
 /** Augmented by handleCommandMessage in messages from the content script */
 declare interface VMMessageSender extends chrome.runtime.MessageSender {
   top?: VMTopRenderMode;
 }
 
-declare type VMMessageTargetFrame = { frameId?: number } | { documentId?: string }
+declare type VMMessageTargetFrame = { frameId?: number } | { documentId?: string };
 /**
  * 0 = frame
  * 1 = top page

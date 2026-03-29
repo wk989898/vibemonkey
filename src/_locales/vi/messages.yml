@@ -244,7 +244,7 @@ extDescription:
   message: Hỗ trợ chạy userscript trên trình duyệt.
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Đã ở trong danh sách đen của Violentmonkey

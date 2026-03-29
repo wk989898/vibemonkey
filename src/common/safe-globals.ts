@@ -1,0 +1,43 @@
+/**
+ * This file is used by entire `src` except `injected`.
+ * `safeCall` centralizes explicit method invocation with a stable `this`.
+ * Standard globals are extracted for better minification and marginally improved lookup speed.
+ * Not exporting NodeJS built-in globals as this file is imported in the test scripts.
+ */
+
+const {
+  Boolean,
+  Error,
+  Object,
+  Promise,
+  addEventListener,
+  removeEventListener,
+  chrome,
+  performance,
+} = globalThis;
+export const SafePromise = Promise; // alias used by browser.js
+export const SafeError = Error; // alias used by browser.js
+export const { apply: safeApply } = Reflect;
+export const hasOwnProperty = safeApply.call.bind({}.hasOwnProperty);
+export const safeCall = Object.call.bind(Object.call);
+export const IS_APPLIED = "isApplied";
+export const IS_FIREFOX = "contextualIdentities" in chrome || "activityLog" in chrome;
+export const ROUTE_SCRIPTS = "#" + SCRIPTS;
+export const extensionRoot = chrome.runtime.getURL("/");
+export const extensionOrigin = extensionRoot.slice(0, -1);
+export const extensionManifest = chrome.runtime.getManifest();
+export const MV3 = extensionManifest.manifest_version === 3;
+// Using getURL because in Firefox manifest contains resolved (full) URLs
+export const extensionOptionsPage = process.env.TEST
+  ? ""
+  : chrome.runtime.getURL(extensionManifest.options_ui?.page || "").split("#", 1)[0];
+export const ICON_PREFIX = chrome.runtime.getURL(extensionManifest.icons[16].replace("16.png", ""));
+export const TAB_SETTINGS = "settings";
+export const TAB_ABOUT = "about";
+export const TAB_RECYCLE = "recycleBin";
+export const BROWSER_ACTION = extensionManifest.action ? "action" : "browser_action";
+export const kDocumentId = "documentId";
+export const kFrameId = "frameId";
+export const INJECT = "inject";
+export const MULTI = "multi";
+export const kWindowId = "windowId";

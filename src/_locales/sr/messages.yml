@@ -240,7 +240,7 @@ extDescription:
   message: Менаџер корисничких скрипти отвореног кода који подржава много претраживача
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Стављено на црну листу у подешавањима Violentmonkey-а.

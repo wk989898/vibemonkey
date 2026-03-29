@@ -1,12 +1,12 @@
 <template>
   <!-- Using an unstyled button for proper native accessibility and Space/Enter keys -->
-  <button class="toggle-button" :class="{active: model}" @click="model = !model">
-    <slot/>
+  <button class="toggle-button" :class="{ active: model }" @click="model = !model">
+    <slot />
   </button>
 </template>
 
-<script setup>
-const model = defineModel({ type: Boolean });
+<script setup lang="ts">
+const model = defineModel<boolean>({ type: Boolean });
 </script>
 
 <style>

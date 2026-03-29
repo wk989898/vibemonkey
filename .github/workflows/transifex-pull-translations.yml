@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '20'
       - name: Install deps
-        run: yarn
+        run: npm ci
       - name: Update translations
         run: node scripts/transifex.mjs pull
         env:

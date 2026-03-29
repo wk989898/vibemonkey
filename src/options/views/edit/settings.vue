@@ -3,22 +3,27 @@
     <h4 v-text="i18n('editLabelSettings')"></h4>
     <div class="mb-2">
       <label>
-        <input type="checkbox" v-model="config.enabled">
-        <span v-text="i18n('buttonEnable')"/>
+        <input type="checkbox" v-model="config.enabled" />
+        <span v-text="i18n('buttonEnable')" />
       </label>
     </div>
-    <VMSettingsUpdate v-bind="{script}" class="mb-2"/>
+    <VMSettingsUpdate v-bind="{ script }" class="mb-2" />
     <div class="mb-2" v-if="hasGmCookie || config.httpOnly">
       <label>
-        <input type="checkbox" v-model="config.httpOnly">
+        <input type="checkbox" v-model="config.httpOnly" />
         <tooltip :content="i18n('labelHttpOnlyCookieHint')">{{
-          i18n('labelHttpOnlyCookie') + $httpOnlyGlobal
+          i18n("labelHttpOnlyCookie") + $httpOnlyGlobal
         }}</tooltip>
       </label>
     </div>
     <div class="flex flex-wrap mr-1c tags">
       <span v-text="i18n('labelTags')" />
-      <input ref="tagsInput" v-model="custom.tags" :disabled="readOnly" @focus.once="onTagsFocused">
+      <input
+        ref="tagsInput"
+        v-model="custom.tags"
+        :disabled="readOnly"
+        @focus.once="onTagsFocused"
+      />
       <button v-if="!store.tags" @click.once="onTagsFocused">...</button>
       <span v-else @click="onTagClicked" class="mr-1c">
         <a v-for="tag in store.tags" :key="tag" v-text="tag" tabindex="0" />
@@ -32,7 +37,7 @@
           <code>@run-at</code>
         </td>
         <td>
-          <p v-text="i18n('labelRunAt')"/>
+          <p v-text="i18n('labelRunAt')" />
         </td>
         <td>
           <select v-model="custom.runAt" :disabled="readOnly">
@@ -49,13 +54,13 @@
           <code>@<s style="color: var(--fill-6)">no</s>frames</code>
         </td>
         <td>
-          <p v-text="i18n('labelNoFrames')"/>
+          <p v-text="i18n('labelNoFrames')" />
         </td>
         <td>
           <select v-model="custom.noframes" :disabled="readOnly">
-            <option value="" v-text="i18n('labelRunAtDefault')"/>
-            <option value="0" v-text="i18n('genericOn')"/>
-            <option value="1" v-text="i18n('genericOff')"/>
+            <option value="" v-text="i18n('labelRunAtDefault')" />
+            <option value="0" v-text="i18n('genericOn')" />
+            <option value="1" v-text="i18n('genericOff')" />
           </select>
         </td>
       </tr>
@@ -64,62 +69,84 @@
           <code>@inject-into</code>
         </td>
         <td>
-          <p v-text="i18n('labelInjectionMode')"/>
+          <p v-text="i18n('labelInjectionMode')" />
         </td>
         <td>
           <select v-model="custom.injectInto" :disabled="readOnly">
-            <option value="" v-text="i18n('labelRunAtDefault')"/>
+            <option value="" v-text="i18n('labelRunAtDefault')" />
             <option v-for="(_, mode) in KII" :key="mode" v-text="mode" />
           </select>
         </td>
       </tr>
-      <tr v-for="([ name, label ]) in textInputs" :key="name">
+      <tr v-for="[name, label] in textInputs" :key="name">
         <td>
-          <code v-text="`@${name}`"/>
+          <code v-text="`@${name}`" />
         </td>
         <td>
-          <p v-text="label"/>
+          <p v-text="label" />
         </td>
         <td>
-          <input type="text" v-model="custom[name]" :placeholder="placeholders[name]" :disabled="readOnly">
+          <input
+            type="text"
+            v-model="custom[name]"
+            :placeholder="placeholders[name]"
+            :disabled="readOnly"
+          />
         </td>
       </tr>
     </table>
     <table>
-      <tr v-for="([ name, orig, labelA, code, labelB ]) in textAreas" :key="name">
+      <tr v-for="[name, orig, labelA, code, labelB] in textAreas" :key="name">
         <td>
           <p>
-            <span v-text="labelA"/>
-            <code v-text="code"/>
-            <span v-text="labelB"/>
+            <span v-text="labelA" />
+            <code v-text="code" />
+            <span v-text="labelB" />
           </p>
           <label>
-            <input type="checkbox" v-model="custom[orig]" :disabled="readOnly">
-            <span v-text="i18n('labelKeepOriginal')"/>
+            <input type="checkbox" v-model="custom[orig]" :disabled="readOnly" />
+            <span v-text="i18n('labelKeepOriginal')" />
           </label>
         </td>
         <td>
-          <textarea v-model="custom[name]" spellcheck="false" :rows="calcRows(custom[name])" :disabled="readOnly" />
+          <textarea
+            v-model="custom[name]"
+            spellcheck="false"
+            :rows="calcRows(custom[name])"
+            :disabled="readOnly"
+          />
         </td>
       </tr>
     </table>
   </div>
 </template>
 
-<script setup>
-import { computed, nextTick, onActivated, onDeactivated, ref, shallowRef } from 'vue';
-import Tooltip from 'vueleton/lib/tooltip';
-import { getScriptHome, i18n } from '@/common';
-import { KNOWN_INJECT_INTO } from '@/common/consts';
-import hookSetting from '@/common/hook-setting';
-import { objectPick } from '@/common/object';
-import { kGmCookieHttpOnly } from '@/common/options-defaults';
-import VMSettingsUpdate from './settings-update';
+<script setup lang="ts">
+import { computed, nextTick, onActivated, onDeactivated, ref, shallowRef } from "vue";
+import Tooltip from "vueleton/lib/tooltip";
+import { getScriptHome, i18n } from "@/common";
+import { KNOWN_INJECT_INTO } from "@/common/consts";
+import hookSetting from "@/common/hook-setting";
+import { objectPick } from "@/common/object";
+import { kGmCookieHttpOnly } from "@/common/options-defaults";
+import VMSettingsUpdate from "./settings-update.vue";
 import {
-  kDownloadURL, kExclude, kExcludeMatch, kHomepageURL, kIcon, kInclude, kMatch, kName, kOrigExclude,
-  kOrigExcludeMatch, kOrigInclude, kOrigMatch, kUpdateURL,
-  store, updateTags,
-} from '../../utils';
+  kDownloadURL,
+  kExclude,
+  kExcludeMatch,
+  kHomepageURL,
+  kIcon,
+  kInclude,
+  kMatch,
+  kName,
+  kOrigExclude,
+  kOrigExcludeMatch,
+  kOrigInclude,
+  kOrigMatch,
+  kUpdateURL,
+  store,
+  updateTags,
+} from "../../utils";
 
 const props = defineProps({
   script: Object,
@@ -127,64 +154,63 @@ const props = defineProps({
 });
 const KII = shallowRef(KNOWN_INJECT_INTO);
 
-const highlightMetaKeys = str => str.match(/^(.*?)(@[-a-z]+)(.*)/)?.slice(1) || [str, '', ''];
+const highlightMetaKeys = (str) => str.match(/^(.*?)(@[-a-z]+)(.*)/)?.slice(1) || [str, "", ""];
 const config = computed(() => props.script.config);
 const custom = computed(() => props.script.custom);
 const hasGmCookie = computed(() => {
   const { grant } = props.script.meta;
-  return grant.includes('GM_cookie') || grant.includes('GM.cookie');
+  return grant.includes("GM_cookie") || grant.includes("GM.cookie");
 });
-const $httpOnlyGlobal = ref('');
+const $httpOnlyGlobal = ref("");
 const placeholders = computed(() => {
   const { script } = props;
   const { meta } = script;
   return {
     ...objectPick(meta, [kIcon, kName]),
     [kHomepageURL]: getScriptHome(script),
-    [kUpdateURL]: meta[kUpdateURL] || i18n('hintUseDownloadURL'),
+    [kUpdateURL]: meta[kUpdateURL] || i18n("hintUseDownloadURL"),
     [kDownloadURL]: meta[kDownloadURL] || script.custom.lastInstallURL,
   };
 });
 const tagsInput = ref();
 const textInputs = [
-  [kName, i18n('labelName')],
-  [kHomepageURL, i18n('labelHomepageURL')],
-  [kUpdateURL, i18n('labelUpdateURL')],
-  [kDownloadURL, i18n('labelDownloadURL')],
-  [kIcon, i18n('labelIconURL')],
+  [kName, i18n("labelName")],
+  [kHomepageURL, i18n("labelHomepageURL")],
+  [kUpdateURL, i18n("labelUpdateURL")],
+  [kDownloadURL, i18n("labelDownloadURL")],
+  [kIcon, i18n("labelIconURL")],
 ];
 const textAreas = [
-  [kInclude, kOrigInclude, ...highlightMetaKeys(i18n('labelInclude'))],
-  [kMatch, kOrigMatch, ...highlightMetaKeys(i18n('labelMatch'))],
-  [kExclude, kOrigExclude, ...highlightMetaKeys(i18n('labelExclude'))],
-  [kExcludeMatch, kOrigExcludeMatch, ...highlightMetaKeys(i18n('labelExcludeMatch'))],
+  [kInclude, kOrigInclude, ...highlightMetaKeys(i18n("labelInclude"))],
+  [kMatch, kOrigMatch, ...highlightMetaKeys(i18n("labelMatch"))],
+  [kExclude, kOrigExclude, ...highlightMetaKeys(i18n("labelExclude"))],
+  [kExcludeMatch, kOrigExcludeMatch, ...highlightMetaKeys(i18n("labelExcludeMatch"))],
 ];
 
 let revokers;
 
 onActivated(() => {
   revokers = [
-    hookSetting(kGmCookieHttpOnly, val => {
-      $httpOnlyGlobal.value = val ? ''
-        : '\n' + i18n('labelScriptOptionRequiredGlobal');
+    hookSetting(kGmCookieHttpOnly, (val) => {
+      $httpOnlyGlobal.value = val ? "" : "\n" + i18n("labelScriptOptionRequiredGlobal");
     }),
   ];
 });
 onDeactivated(() => {
-  revokers.forEach(r => r());
+  revokers.forEach((r) => r());
   revokers = null;
 });
 
 function onTagClicked({ target }) {
-  if (target.tagName !== 'A') return;
+  if (target.tagName !== "A") return;
   const obj = props.script.custom;
   const curText = obj.tags;
   const elInput = /**@type {HTMLInputElement}*/ tagsInput.value;
   const { selectionEnd, selectionStart } = elInput;
   const tag =
-    (!selectionStart || curText[selectionStart - 1] === ' ' ? '' : ' ') +
+    (!selectionStart || curText[selectionStart - 1] === " " ? "" : " ") +
     target.textContent +
-    (curText[selectionEnd] === ' ' ? '' : ' ');
+    (curText[selectionEnd] === " " ? "" : " ");
   const i = selectionStart + tag.length;
   obj.tags = curText.slice(0, selectionStart) + tag + curText.slice(selectionEnd);
   elInput.focus();

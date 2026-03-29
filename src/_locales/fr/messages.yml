@@ -256,7 +256,7 @@ extDescription:
   message: Un gestionnaire de scripts utilisateur qui supporte beaucoup de navigateurs
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Sur la liste noire des paramètres de Violentmonkey
@@ -522,7 +522,7 @@ labelHttpOnlyCookieHint:
   message: ''
 labelIconURL:
   description: Label for the input.
-  message: 'URL de l''icône :'
+  message: "URL de l'icône :"
 labelImportScriptData:
   description: Option to import script data along with scripts.
   message: Importer les données du script

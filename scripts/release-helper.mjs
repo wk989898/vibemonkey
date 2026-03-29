@@ -1,7 +1,7 @@
-import { readdir, readFile } from 'fs/promises';
-import { join } from 'path';
-import github from '@actions/github';
-import { exec } from './common.js';
+import { readdir, readFile } from "fs/promises";
+import { join } from "path";
+import github from "@actions/github";
+import { exec } from "./common.mjs";
 
 const { VERSION, ASSETS_DIR, GITHUB_TOKEN } = process.env;
 const tag = `v${VERSION}`;
@@ -18,7 +18,7 @@ export async function getRelease() {
       ...github.context.repo,
       tag,
     });
-    console.info('Found release:', tag);
+    console.info("Found release:", tag);
     return result.data;
   } catch (err) {
     if (err.status !== 404) throw err;
@@ -26,59 +26,59 @@ export async function getRelease() {
 }
 
 function listCommits() {
-  const thisTag = exec('git describe --abbrev=0 --tags');
+  const thisTag = exec("git describe --abbrev=0 --tags");
   const prevTag = exec(`git describe --abbrev=0 --tags "${thisTag}^"`);
   const tagRange = `${prevTag}...${thisTag}`;
   const list = exec(`git log --oneline --skip=1 --reverse "${tagRange}"`)
-  .replace(/</g, '\\<')
-  .split('\n')
-  .map((str, i) => `${str.split(/\s/, 2)[1]}${10000 + i}\n* ${str}`)
-  .sort()
-  .map(str => str.split('\n')[1])
-  .join('\n');
+    .replace(/</g, "\\<")
+    .split("\n")
+    .map((str, i) => `${str.split(/\s/, 2)[1]}${10000 + i}\n* ${str}`)
+    .sort()
+    .map((str) => str.split("\n")[1])
+    .join("\n");
   return `${prevTag}:\n${list}\n\nCommit log: ${
-    process.env.GITHUB_SERVER_URL || 'https://github.com'
-  }/${
-    process.env.GITHUB_REPOSITORY || 'violentmonkey/violentmonkey'
-  }/compare/${tagRange}`;
+    process.env.GITHUB_SERVER_URL || "https://github.com"
+  }/${process.env.GITHUB_REPOSITORY || "wk989898/vibemonkey"}/compare/${tagRange}`;
 }
 
 function getReleaseNote() {
-  return `${process.env.PRERELEASE === 'true' ? `\
-**This is a beta release of Violentmonkey (also in [WebStore](\
-https://chrome.google.com/webstore/detail/violentmonkey-beta/opokoaglpekkimldnlggpoagmjegichg\
-)), use it at your own risk.**<br>\
-If you already use Violentmonkey, click \`Export to zip\` in settings before installing the beta.
+  return `${
+    process.env.PRERELEASE === "true"
+      ? `\
+**This is a beta release of VibeMonkey, use it at your own risk.**<br>\
+If you already use VibeMonkey, click \`Export to zip\` in settings before installing the beta.
 
-` : ''}Notable changes since ${listCommits()}`;
+`
+      : ""
+  }Notable changes since ${listCommits()}`;
 }
 
 export async function createRelease() {
-  console.info('Create release:', tag);
+  console.info("Create release:", tag);
   const result = await getOctokit().rest.repos.createRelease({
     ...github.context.repo,
     tag_name: tag,
     name: process.env.RELEASE_NAME,
     body: getReleaseNote(),
-    prerelease: process.env.PRERELEASE == 'true',
+    prerelease: process.env.PRERELEASE == "true",
   });
   return result.data;
 }
 
 export async function ensureRelease() {
-  const release = await getRelease() || await createRelease();
+  const release = (await getRelease()) || (await createRelease());
   return release;
 }
 
 export async function hasAsset(fileName) {
   const release = await getRelease();
-  return release?.assets.some(asset => asset.name === fileName);
+  return release?.assets.some((asset) => asset.name === fileName);
 }
 
 export async function uploadAssets() {
   const release = await ensureRelease();
   let assets = await readdir(ASSETS_DIR);
-  assets = assets.filter(asset => release.assets.every(({ name }) => name !== asset));
+  assets = assets.filter((asset) => release.assets.every(({ name }) => name !== asset));
   for (const asset of assets) {
     console.info(`> Upload asset: ${asset}`);
     await getOctokit().rest.repos.uploadReleaseAsset({
@@ -88,20 +88,20 @@ export async function uploadAssets() {
       data: await readFile(join(ASSETS_DIR, asset)),
     });
   }
-  if (assets.length) console.info('Done');
-  else console.info('No asset to upload');
+  if (assets.length) console.info("Done");
+  else console.info("No asset to upload");
 }
 
 export async function notifyReleaseStatus({ title, description, success = true }) {
   const { DISCORD_WEBHOOK_RELEASE } = process.env;
   if (!DISCORD_WEBHOOK_RELEASE) {
-    console.warn('DISCORD_WEBHOOK_RELEASE is not available!');
+    console.warn("DISCORD_WEBHOOK_RELEASE is not available!");
     return;
   }
   const res = await fetch(DISCORD_WEBHOOK_RELEASE, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       embeds: [

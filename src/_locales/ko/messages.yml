@@ -231,7 +231,7 @@ extDescription:
   message: 유저스크립트를 실행합니다.
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Violentmonkey 블랙리스트 목록에 추가되어 있습니다

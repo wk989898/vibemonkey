@@ -248,7 +248,7 @@ extDescription:
     щоб змінювати їх вигляд чи поведінку.
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Чорний список Violentmonkey
@@ -519,7 +519,7 @@ labelInjectionMode:
   description: >-
     Label for option in advanced settings and in script settings. Don't forget
     the space after ":" if the translated language separates words with spaces.
-  message: 'Метод ін''єкції: '
+  message: "Метод ін'єкції: "
 labelInstall:
   description: Shown in the title of the confirm page while trying to install a script.
   message: Встановлення скрипта...
@@ -645,7 +645,7 @@ labelSyncService:
   message: Синхронізувати з
 labelSyncUsername:
   description: Label for input to hold username.
-  message: 'Ім''я користувача:'
+  message: "Ім'я користувача:"
 labelTags:
   description: Label for custom tags.
   message: Теги (розділені пробілом)

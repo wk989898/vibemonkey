@@ -245,7 +245,7 @@ extDescription:
   message: En användarskripthanterare med öppen källkod som stöder många webbläsare
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Svartlistad i Violentmonkey's inställningar

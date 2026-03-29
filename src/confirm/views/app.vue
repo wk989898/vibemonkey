@@ -1,232 +1,342 @@
 <template>
   <div class="page-confirm frame flex flex-col h-screen" :class="{ reinstall }">
     <div v-if="info.fs" id="wall">
-      <b v-text="info.fs[0]"/>
+      <b v-text="info.fs[0]" />
       <ol>
-        <li v-for="(str, i) in info.fs.slice(1)" :key="i" v-text="str" class="mt-1"/>
+        <li v-for="(str, i) in info.fs.slice(1)" :key="i" v-text="str" class="mt-1" />
       </ol>
-      <hr>
-      <a class="mt-1" :href="externalEditorInfoUrl" v-text="externalEditorInfoUrl"/>
-      <hr>
-      <setting-check name="helpForLocalFile" :label="i18n('helpForLocalFile')"/>
+      <hr />
+      <a class="mt-1" :href="externalEditorInfoUrl" v-text="externalEditorInfoUrl" />
+      <hr />
+      <setting-check name="helpForLocalFile" :label="i18n('helpForLocalFile')" />
     </div>
     <template v-else>
-    <div class="frame-block">
-      <div class="flex">
-        <div class="image">
-          <img src="/public/images/icon128.png">
-        </div>
-        <div class="info">
-          <h1>
-            <div>
-              <span v-text="heading"/>
-              <span v-text="i18n('msgSameCode')" style="font-weight:normal" v-if="sameCode"/>
-            </div>
-            <div class="ellipsis" v-text="scriptName"/>
-          </h1>
-          <div class="flex">
-            <tooltip :content="i18n('editNavCode')" class="abs-center" placement="right">
-              <icon name="code"/>
-            </tooltip>
-            <span class="ellipsis" v-text="info.url ? decodeURIComponent(info.url) : '...'"/>
+      <div class="frame-block">
+        <div class="flex">
+          <div class="image">
+            <img src="/public/images/icon128.png" />
           </div>
-          <a v-for="([url, icon, title]) in icons" :key="icon"
-             class="flex" target="_blank" :href="url">
-            <tooltip :content="title" class="abs-center" placement="right">
-              <icon :name="icon"/>
-            </tooltip>
-            <span class="ellipsis" v-text="decodeURIComponent(url)"/>
-          </a>
-          <p class="descr" v-text="descr"/>
-          <div class="lists flex flex-wrap" :data-collapsed="!listsShown">
-            <div class="toggle abs-center" @click="listsShown = !listsShown">
-              <tooltip :content="i18n('msgShowHide')" placement="bottom" align="left" v-if="lists">
-                <icon name="info"/>
+          <div class="info">
+            <h1>
+              <div>
+                <span v-text="heading" />
+                <span v-text="i18n('msgSameCode')" style="font-weight: normal" v-if="sameCode" />
+              </div>
+              <div class="ellipsis" v-text="scriptName" />
+            </h1>
+            <div class="flex">
+              <tooltip :content="i18n('editNavCode')" class="abs-center" placement="right">
+                <icon name="code" />
               </tooltip>
+              <span class="ellipsis" v-text="info.url ? decodeURIComponent(info.url) : '...'" />
             </div>
-            <dl v-for="(list, name) in lists" :key="name"
-                :data-type="name" :hidden="!list.length" tabindex="0">
-              <dt v-text="name ? `@${name}` : i18n('genericError')"/>
-              <dd v-text="list" class="ellipsis"/>
-            </dl>
+            <a
+              v-for="[url, icon, title] in icons"
+              :key="icon"
+              class="flex"
+              target="_blank"
+              :href="url"
+            >
+              <tooltip :content="title" class="abs-center" placement="right">
+                <icon :name="icon" />
+              </tooltip>
+              <span class="ellipsis" v-text="decodeURIComponent(url)" />
+            </a>
+            <p class="descr" v-text="descr" />
+            <div class="lists flex flex-wrap" :data-collapsed="!listsShown">
+              <div class="toggle abs-center" @click="listsShown = !listsShown">
+                <tooltip
+                  :content="i18n('msgShowHide')"
+                  placement="bottom"
+                  align="left"
+                  v-if="lists"
+                >
+                  <icon name="info" />
+                </tooltip>
+              </div>
+              <dl
+                v-for="(list, name) in lists"
+                :key="name"
+                :data-type="name"
+                :hidden="!list.length"
+                tabindex="0"
+              >
+                <dt v-text="name ? `@${name}` : i18n('genericError')" />
+                <dd v-text="list" class="ellipsis" />
+              </dl>
+            </div>
+            <div v-if="!script && message" v-text="message" class="warning" />
           </div>
-          <div v-if="!script && message" v-text="message" class="warning"/>
         </div>
-      </div>
-      <div class="flex" v-if="script">
-        <div class="image flex">
-          <img :src="safeIcon">
-        </div>
-        <div class="actions flex flex-wrap ml-1c" ref="$buttons">
-          <button
-            id="confirm"
-            :data-hotkey="hotkey[0]"
-            v-text="_verb = reinstall ? i18n('reinstall') : i18n('install')"
-            v-bind="_bind = {disabled: !installable, onclick: installScript}"/>
-          <button
-              id="+close" :data-verb="_verb" :data-hotkey="hotkey.close"
-              v-text="i18n('buttonClose')" v-bind="_bind"/>
-          <setting-check
-              name="closeAfterInstall" ref="$close" class="btn-ghost"
-              :class="{dim: hotkey.track || hotkey.edit}"
-              :title="labelDefault"/>
-          <button
-              id="+edit" :data-verb="_verb" :data-hotkey="hotkey.edit"
-              v-text="i18n('buttonEdit')" v-bind="_bind"/>
-          <setting-check
-              name="editAfterInstall" ref="$edit" class="btn-ghost"
-              :title="labelDefault" :class="{dim: hotkey.track}"/>
-          <template v-if="isLocal">
-            <button id="+track" @click="installScript"
-                    :data-hotkey="hotkey.track"
-                    :disabled="!tracking && !installable && !installed"
-                    v-text="tracking ? i18n('stopTracking') : `✚ ${i18n('trackEdits')}`"/>
+        <div class="flex" v-if="script">
+          <div class="image flex">
+            <img :src="safeIcon" />
+          </div>
+          <div class="actions flex flex-wrap ml-1c" ref="$buttons">
+            <button
+              id="confirm"
+              :data-hotkey="hotkey[0]"
+              v-text="_verb = reinstall ? i18n('reinstall') : i18n('install')"
+              v-bind="_bind = { disabled: !installable, onclick: installScript }"
+            />
+            <button
+              id="+close"
+              :data-verb="_verb"
+              :data-hotkey="hotkey.close"
+              v-text="i18n('buttonClose')"
+              v-bind="_bind"
+            />
             <setting-check
-                name="trackLocalFile" ref="$track" class="btn-ghost" v-show="!tracking"
-                @change="trackLocalFile" :title="labelDefault"/>
-            <tooltip :content="i18n('reloadTabTrackHint')" v-show="tracking">
-              <label class="setting-check">
-                <input type="checkbox" v-model="reloadTab">
-                <span v-text="i18n('reloadTab')" />
-              </label>
-            </tooltip>
-          </template>
-          <button v-text="i18n('buttonClose')" @click="closeTab"/>
-          <div v-text="message" v-if="message" :title="error"
-               class="status stretch-self flex center-items ml-2"/>
+              name="closeAfterInstall"
+              ref="$close"
+              class="btn-ghost"
+              :class="{ dim: hotkey.track || hotkey.edit }"
+              :title="labelDefault"
+            />
+            <button
+              id="+edit"
+              :data-verb="_verb"
+              :data-hotkey="hotkey.edit"
+              v-text="i18n('buttonEdit')"
+              v-bind="_bind"
+            />
+            <setting-check
+              name="editAfterInstall"
+              ref="$edit"
+              class="btn-ghost"
+              :title="labelDefault"
+              :class="{ dim: hotkey.track }"
+            />
+            <template v-if="isLocal">
+              <button
+                id="+track"
+                @click="installScript"
+                :data-hotkey="hotkey.track"
+                :disabled="!tracking && !installable && !installed"
+                v-text="tracking ? i18n('stopTracking') : `✚ ${i18n('trackEdits')}`"
+              />
+              <setting-check
+                name="trackLocalFile"
+                ref="$track"
+                class="btn-ghost"
+                v-show="!tracking"
+                @change="trackLocalFile"
+                :title="labelDefault"
+              />
+              <tooltip :content="i18n('reloadTabTrackHint')" v-show="tracking">
+                <label class="setting-check">
+                  <input type="checkbox" v-model="reloadTab" />
+                  <span v-text="i18n('reloadTab')" />
+                </label>
+              </tooltip>
+            </template>
+            <button v-text="i18n('buttonClose')" @click="closeTab" />
+            <div
+              v-text="message"
+              v-if="message"
+              :title="error"
+              class="status stretch-self flex center-items ml-2"
+            />
+          </div>
         </div>
+        <div class="warning" v-if="info.incognito" v-text="i18n('msgIncognitoChanges')" />
       </div>
-      <div class="warning" v-if="info.incognito" v-text="i18n('msgIncognitoChanges')"/>
-    </div>
-    <div class="frame-block flex-1 pos-rel">
-      <vm-externals
-        ref="$externals"
-        v-if="script"
-        :value="script"
-        class="abs-full"
-        :cm-options="cmOptions"
-        :commands
-        :install="{ code, deps, url: info.url }"
-      />
-    </div>
+      <div class="frame-block flex-1 pos-rel">
+        <vm-externals
+          ref="$externals"
+          v-if="script"
+          :value="script"
+          class="abs-full"
+          :cm-options="cmOptions"
+          :commands
+          :install="{ code, deps, url: info.url }"
+        />
+      </div>
     </template>
   </div>
 </template>
 
-<script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import Tooltip from 'vueleton/lib/tooltip';
-import Icon from '@/common/ui/icon';
+<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import Tooltip from "vueleton/lib/tooltip";
+import Icon from "@/common/ui/icon.vue";
 import {
-  debounce, getFullUrl, getLocaleString, getScriptHome, i18n, isRemote, makePause, sendCmdDirectly,
+  debounce,
+  getFullUrl,
+  getLocaleString,
+  getScriptHome,
+  i18n,
+  isRemote,
+  makePause,
+  sendCmdDirectly,
   trueJoin,
-} from '@/common';
-import { keyboardService, modifiers } from '@/common/keyboard';
-import initCache from '@/common/cache';
-import VmExternals from '@/common/ui/externals';
-import SettingCheck from '@/common/ui/setting-check';
-import { loadScriptIcon } from '@/common/load-script-icon';
-import { deepEqual, objectPick } from '@/common/object';
-import { route } from '@/common/router';
-import { externalEditorInfoUrl } from '@/common/ui';
+} from "@/common";
+import { keyboardService, modifiers } from "@/common/keyboard";
+import initCache from "@/common/cache";
+import VmExternals from "@/common/ui/externals.vue";
+import SettingCheck from "@/common/ui/setting-check.vue";
+import { loadScriptIcon } from "@/common/load-script-icon";
+import { deepEqual, objectPick } from "@/common/object";
+import { route } from "@/common/router";
+import { externalEditorInfoUrl } from "@/common/ui";
+
+type ConfirmCache = {
+  ff?: number;
+  from?: string;
+  fs?: boolean | string[];
+  incognito?: boolean;
+  tabId?: number;
+  url: string;
+};
+
+type ConfirmHotkeyMap = Partial<Record<"track" | "edit" | "close", string>> & {
+  0?: string;
+};
+
+type ConfirmIconLink = [string, string, string];
+
+type ConfirmLists = Record<string, string>;
+
+type ConfirmMeta = Partial<VMScript["meta"]> & Record<string, string | string[] | undefined>;
+
+type ConfirmScript = Omit<Partial<VMScript>, "meta" | "custom" | "props"> & {
+  meta: ConfirmMeta;
+  custom: Partial<VMScript["custom"]>;
+  props: Partial<VMScript["props"]>;
+};
+
+type SettingCheckRef = {
+  value?: unknown;
+};
+
+type ExternalsRef = {
+  $code?: {
+    cm?: any;
+  };
+};
+
+type ParseMetaResult = {
+  meta: ConfirmMeta;
+  errors: string[];
+};
+
+type ParseScriptResult = {
+  update: {
+    message: string;
+    props: {
+      id: number;
+    };
+  };
+};
+
+type GetFileOptions = {
+  isBlob?: boolean;
+  useCache?: boolean;
+};
+
+type FileSystemObserverLike = {
+  observe(handle: FileSystemFileHandle): Promise<void>;
+  disconnect(): void;
+};
+
+type LocalFileHandle = FileSystemFileHandle & FileSystemHandleWithUrl;
 
 const KEEP_INFO_DELAY = 5000;
 const RETRY_DELAY = 3000;
 const RETRY_COUNT = 2;
 const MAX_TITLE_NAME_LEN = 100;
-const CONFIRM_HOTKEY = `${modifiers.ctrlcmd === 'm' ? '⌘' : 'Ctrl-'}Enter`;
+const CONFIRM_HOTKEY = `${modifiers.ctrlcmd === "m" ? "⌘" : "Ctrl-"}Enter`;
 const DROP_PREFIX = `file:///*drag-n-drop*/`;
-const cache = initCache({ lifetime: RETRY_DELAY * (RETRY_COUNT + 1) });
-const labelDefault = i18n('labelRunAtDefault');
+const cache = initCache<string>({ lifetime: RETRY_DELAY * (RETRY_COUNT + 1) });
+const labelDefault = i18n("labelRunAtDefault");
 
-const $buttons = ref();
-const $close = ref();
-const $edit = ref();
-const $track = ref();
-const $externals = ref();
+const $buttons = ref<HTMLDivElement | null>(null);
+const $close = ref<SettingCheckRef | null>(null);
+const $edit = ref<SettingCheckRef | null>(null);
+const $track = ref<SettingCheckRef | null>(null);
+const $externals = ref<ExternalsRef | null>(null);
 
-const cmOptions = ref({ lineWrapping: true });
-const code = ref('');
-const commands = ref({ close: closeTab });
-const deps = ref({}); // combines `require` and `resources` i.e. all actually loaded deps
-const descr = ref('');
-const error = ref();
-const heading = ref(i18n('msgLoadingData'));
-const info = ref(/** @type {VM.ConfirmCache} */{});
+const cmOptions = ref<Record<string, boolean>>({ lineWrapping: true });
+const code = ref("");
+const commands = ref<Record<string, () => void>>({ close: closeTab });
+const deps = ref<Record<string, string | false | null>>({}); // combines `require` and `resources` i.e. all actually loaded deps
+const descr = ref("");
+const error = ref<string | null>(null);
+const heading = ref(i18n("msgLoadingData"));
+const info = ref<ConfirmCache>({ url: "" });
 const installable = ref(false);
 const installed = ref(false);
 const isLocal = computed(() => !isRemote(info.value.url));
-const lists = ref();
+const lists = ref<ConfirmLists | null>(null);
 const listsShown = ref(true);
-const message = ref('');
-const scriptName = ref('\xA0');
+const message = ref("");
+const scriptName = ref("\xA0");
 const reinstall = ref(false);
 const reloadTab = ref(false);
-const safeIcon = ref();
+const safeIcon = ref<string | null>(null);
 const sameCode = ref(false);
-const script = ref();
+const script = ref<ConfirmScript | null>(null);
 const tracking = ref(false);
 
-const hotkey = computed(() => ({
-  [isLocal.value && $track.value?.value ? 'track'
-    : $edit.value?.value ? 'edit'
-    : $close.value?.value ? 'close'
-    : 0
-  ]: CONFIRM_HOTKEY
+const hotkey = computed<ConfirmHotkeyMap>(() => ({
+  [isLocal.value && $track.value?.value
+    ? "track"
+    : $edit.value?.value
+      ? "edit"
+      : $close.value?.value
+        ? "close"
+        : 0]: CONFIRM_HOTKEY,
 }));
-const icons = computed(() => {
+const icons = computed<ConfirmIconLink[]>(() => {
   const scr = script.value;
   const homepageURL = scr && getScriptHome(scr);
   const supportURL = scr?.meta.supportURL;
   return [
-    homepageURL && [homepageURL, 'home', i18n('labelHomepage')],
-    supportURL && [supportURL, 'question', i18n('buttonSupport')],
-  ].filter(Boolean);
+    homepageURL && [homepageURL, "home", i18n("labelHomepage")],
+    supportURL && [supportURL, "question", i18n("buttonSupport")],
+  ].filter((item): item is ConfirmIconLink => !!item);
 });
 
-/** @type {FileSystemFileHandle} */
-let fileHandle;
-/** @type {FileSystemObserver | false} */
-let fso;
-/** @type {chrome.runtime.Port} */
-let filePort;
-let filePortResolve;
-/** @type {boolean} */
-let filePortNeeded;
-let basicTitle;
-let cachedCodePromise;
-let stopResolve;
-let confirmedTime;
-let disposeList;
-let guard;
-/** @type {VM.ConfirmCache} */
-let infoVal;
-let lastScriptId;
-let requireCache, requireUrls;
-let resourceCache, resourceUrls;
-let trackingPromise;
+let fileHandle: LocalFileHandle | null = null;
+let fso: FileSystemObserverLike | false | null = null;
+let filePort: browser.runtime.Port | null = null;
+let filePortResolve: ((value: string | null) => void) | null = null;
+let filePortNeeded = false;
+let basicTitle = "";
+let cachedCodePromise: Promise<string | null> | null = null;
+let stopResolve: ((stop?: boolean) => void) | null = null;
+let confirmedTime = "";
+let disposeList: Array<() => void> | null = null;
+let guard: ReturnType<typeof setInterval> | null = null;
+let infoVal: ConfirmCache = { url: "" };
+let lastScriptId: number | undefined;
+let requireCache: StringMap | null = null;
+let requireUrls: string[] = [];
+let resourceCache: StringMap | null = null;
+let resourceUrls: string[] = [];
+let trackingPromise: Promise<boolean | void> | false | null = null;
 
 onMounted(async () => {
-  const id = route.paths[0];
+  const id = route.paths?.[0] || "";
   const key = `confirm-${id}`;
-  const FSH = 'fsh';
-  fileHandle = window[FSH];
+  const FSH = "fsh";
+  fileHandle = (window[FSH] as LocalFileHandle | undefined) || null;
   Object.defineProperty(window, FSH, { set: loadNewFileHandle });
   infoVal = info.value = fileHandle
     ? { url: fileHandle._url || DROP_PREFIX + fileHandle.name }
-    : await sendCmdDirectly('CacheLoad', key);
+    : ((await sendCmdDirectly("CacheLoad", key)) as ConfirmCache);
   if (!infoVal) {
     closeTab();
     return;
   }
   if (infoVal.fs) {
-    info.value.fs = i18n('fileInstallBlocked').split(/<\d+>/);
+    info.value.fs = i18n("fileInstallBlocked").split(/<\d+>/);
     return;
   }
   if (!fileHandle) {
-    filePortNeeded = infoVal.ff >= 68 && infoVal.url.startsWith('file:');
-    cachedCodePromise = sendCmdDirectly('CachePop', infoVal.url);
-    guard = setInterval(sendCmdDirectly, KEEP_INFO_DELAY, 'CacheHit', { key });
+    filePortNeeded = !!infoVal.ff && infoVal.ff >= 68 && infoVal.url.startsWith("file:");
+    cachedCodePromise = sendCmdDirectly("CachePop", infoVal.url) as Promise<string | null>;
+    guard = setInterval(sendCmdDirectly, KEEP_INFO_DELAY, "CacheHit", { key });
   }
   await initScript();
   initKeys();
@@ -234,36 +344,36 @@ onMounted(async () => {
 
 async function initScript() {
   await loadData();
-  if (!await parseMeta()) return;
+  if (!(await parseMeta())) return;
   await Promise.all([
     checkSameCode(),
     (async () => {
       let retries = RETRY_COUNT;
-      while (!await loadDeps() && retries) {
+      while (!(await loadDeps()) && retries) {
         await makePause(RETRY_DELAY);
         retries -= 1;
       }
     })(),
   ]);
   if (installable.value) {
-    heading.value = reinstall.value ? i18n('labelReinstall') : i18n('labelInstall');
+    heading.value = reinstall.value ? i18n("labelReinstall") : i18n("labelInstall");
   }
 }
 function initKeys() {
   disposeList = [
-    keyboardService.register('ctrlcmd-enter', () => {
-      $buttons.value.querySelector('[data-hotkey]').click();
+    keyboardService.register("ctrlcmd-enter", () => {
+      $buttons.value?.querySelector<HTMLElement>("[data-hotkey]")?.click();
     }),
   ];
   keyboardService.enable();
 }
 
 onBeforeUnmount(() => {
-  clearInterval(guard);
-  disposeList?.forEach(dispose => dispose());
+  if (guard) clearInterval(guard);
+  disposeList?.forEach((dispose) => dispose());
 });
 
-async function loadNewFileHandle(fh) {
+async function loadNewFileHandle(fh: LocalFileHandle) {
   info.value.fs = installable.value = tracking.value = false;
   stopResolve?.();
   await trackingPromise;
@@ -274,73 +384,86 @@ async function loadNewFileHandle(fh) {
   await initScript();
   if (!disposeList) initKeys();
 }
-async function loadData(changedOnly) {
+async function loadData(changedOnly?: boolean) {
   installable.value = false;
   const newCode = filePortNeeded
-    ? await new Promise(pingFilePort)
+    ? await new Promise<string | null>(pingFilePort)
     : await getScript(infoVal.url);
-  if (newCode == null || changedOnly && code.value === newCode) {
+  if (newCode == null || (changedOnly && code.value === newCode)) {
     throw 0;
   }
-  const cm = $externals.value?.$code.cm;
+  const cm = $externals.value?.$code?.cm;
   const lines = cm && newCode.split(/\r?\n/);
   let i = -1;
   let isDiff;
   cm?.eachLine(({ text }) => (isDiff = text !== lines[++i]));
   code.value = newCode;
-  if (isDiff || cm && i < lines.length - 1) {
+  if (isDiff || (cm && i < lines.length - 1)) {
     await nextTick();
     cm.setCursor(i);
     cm.scrollIntoView(null, cm.display.lastWrapHeight / 3);
   }
 }
-async function parseMeta() {
-  const res = await sendCmdDirectly('ParseMeta', code.value);
+async function parseMeta(): Promise<ParseMetaResult | undefined> {
+  const res = (await sendCmdDirectly("ParseMeta", code.value)) as ParseMetaResult;
   const { meta, errors } = res;
-  const name = getLocaleString(meta, 'name');
+  const name = getLocaleString(meta as Record<string, string>, "name");
   document.title = `${
     name.slice(0, MAX_TITLE_NAME_LEN) || errors[0] // no name error
-  }${
-    name.length > MAX_TITLE_NAME_LEN ? '...' : ''
-  } - ${
+  }${name.length > MAX_TITLE_NAME_LEN ? "..." : ""} - ${
     basicTitle || (basicTitle = document.title)
   }`;
-  scriptName.value = [name, meta.version]::trueJoin(', ');
-  descr.value = getLocaleString(meta, 'description');
+  scriptName.value = trueJoin.call([name, meta.version], ", ");
+  descr.value = getLocaleString(meta as Record<string, string>, "description");
   lists.value = Object.assign(
-    !meta ? {} : objectPick(meta, [
-      'antifeature',
-      'grant',
-      'match',
-      'include',
-      'exclude',
-      'excludeMatch',
-      'compatible',
-      'connect',
-    ], list => list?.map(s => [s.replace(/^\W+/, '') || s, s])
-      .sort(([a], [b]) => (a < b ? -1 : a > b))
-      .map(([, s]) => s)
-      .join('\n')
-      || ''
-    ), {
-      '': errors?.join('\n') || '',
-    });
+    !meta
+      ? {}
+      : objectPick(
+          meta,
+          [
+            "antifeature",
+            "grant",
+            "match",
+            "include",
+            "exclude",
+            "excludeMatch",
+            "compatible",
+            "connect",
+          ],
+          (list) =>
+            (list as string[] | undefined)
+              ?.map((s) => [s.replace(/^\W+/, "") || s, s])
+              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .map(([, s]) => s)
+              .join("\n") || "",
+        ),
+    {
+      "": errors?.join("\n") || "",
+    },
+  );
   // Creating a script even if meta is invalid to show the code to the user.
   script.value = { meta: meta || {}, custom: {}, props: {} };
   if (meta) {
-    requireUrls = [...new Set(meta.require)];
-    resourceUrls = [...new Set(Object.values(meta.resources))];
+    requireUrls = [...new Set(meta.require || [])];
+    resourceUrls = [...new Set(Object.values(meta.resources || {}))];
   }
-  if (!name) heading.value = i18n('msgInvalidScript');
+  if (!name) heading.value = i18n("msgInvalidScript");
   else return res;
 }
 async function loadDeps() {
+  const currentScript = script.value;
+  if (!currentScript) return;
   if (!safeIcon.value) {
-    loadScriptIcon(script.value).then(url => { safeIcon.value = url; });
+    loadScriptIcon(currentScript as VMScript & Record<string, any>).then((url) => {
+      safeIcon.value = url;
+    });
   }
-  if (requireCache
-  && deepEqual([...requireUrls].sort(), Object.keys(requireCache).sort())
-  && deepEqual([...resourceUrls].sort(), Object.keys(resourceCache).sort())) {
+  if (
+    requireCache &&
+    resourceCache &&
+    deepEqual([...requireUrls].sort(), Object.keys(requireCache).sort()) &&
+    deepEqual([...resourceUrls].sort(), Object.keys(resourceCache).sort())
+  ) {
     return;
   }
   requireCache = {};
@@ -352,15 +475,18 @@ async function loadDeps() {
   const startTime = performance.now();
   const updateStatus = () => {
     if (performance.now() - startTime > STATUS_DELAY) {
-      message.value = i18n('msgLoadingDependency', [finished, length]);
+      message.value = i18n("msgLoadingDependency", [finished, length]);
     }
   };
   /** @returns {string|undefined} URL in case of error or `undefined` on success */
-  const download = async (url, target, isBlob) => {
+  const download = async (url: string, target: StringMap, isBlob: boolean) => {
     const fullUrl = getFullUrl(url, infoVal.url);
     const depsUrl = `${+isBlob}${url}`; // the same URL may be listed in both categories
     try {
-      deps.value[depsUrl] = target[fullUrl] = await getFile(fullUrl, { isBlob, useCache: true });
+      deps.value[depsUrl] = target[fullUrl] = await getFile(fullUrl, {
+        isBlob,
+        useCache: true,
+      });
       finished += 1;
       updateStatus();
     } catch (e) {
@@ -370,13 +496,13 @@ async function loadDeps() {
   };
   const delayedStatus = setTimeout(updateStatus, STATUS_DELAY);
   const promises = [
-    ...requireUrls.map(url => download(url, requireCache, false)),
-    ...resourceUrls.map(url => download(url, resourceCache, true)),
+    ...requireUrls.map((url) => download(url, requireCache, false)),
+    ...resourceUrls.map((url) => download(url, resourceCache, true)),
   ];
-  const err = (await Promise.all(promises))::trueJoin('\n');
+  const err = trueJoin.call(await Promise.all(promises), "\n");
   clearTimeout(delayedStatus);
   if (err) {
-    message.value = i18n('msgErrorLoadingDependency');
+    message.value = i18n("msgErrorLoadingDependency");
     error.value = err;
   } else {
     error.value = null;
@@ -386,45 +512,50 @@ async function loadDeps() {
   }
 }
 function closeTab() {
-  sendCmdDirectly('TabClose');
+  sendCmdDirectly("TabClose", null);
 }
-async function getFile(url, opts) {
+async function getFile(url: string, opts?: GetFileOptions) {
   const { isBlob, useCache } = opts || {};
   const cacheKey = isBlob ? `blob+${url}` : `text+${url}`;
   if (useCache && cache.has(cacheKey)) {
-    return cache.get(cacheKey);
+    return cache.get(cacheKey) as string;
   }
-  const data = await sendCmdDirectly('Request', {
+  const data = (await sendCmdDirectly("Request", {
     url,
     vet: !!opts, // TODO: add a blacklist for installation URLs?
-    [kResponseType]: isBlob ? 'blob' : null,
-  });
+    [kResponseType]: isBlob ? "blob" : null,
+  })) as string;
   if (useCache) cache.put(cacheKey, data);
   return data;
 }
-async function getScript(url) {
+async function getScript(url: string): Promise<string | null | undefined> {
   try {
     return fileHandle
       ? await (await fileHandle.getFile()).text()
-      : cachedCodePromise && await cachedCodePromise || await getFile(url);
-  } catch (e) {
-    // eslint-disable-next-line no-ex-assign
-    if ((e = e.message)?.startsWith('{')) try { e = 'HTTP ' + JSON.parse(e).status; } catch {/**/}
-    message.value = i18n('msgErrorLoadingData') + (e ? '\n' + e : '');
+      : (cachedCodePromise && (await cachedCodePromise)) || (await getFile(url));
+  } catch (err) {
+    let errorMessage = err?.message;
+    if (errorMessage?.startsWith("{"))
+      try {
+        errorMessage = "HTTP " + JSON.parse(errorMessage).status;
+      } catch {
+        /**/
+      }
+    message.value = i18n("msgErrorLoadingData") + (errorMessage ? "\n" + errorMessage : "");
   } finally {
     cachedCodePromise = null;
   }
 }
-async function installScript(evt, parsedMeta) {
-  const btnId = evt?.target.id;
-  if (btnId === '+track' && tracking.value) {
+async function installScript(evt?: MouseEvent | null, parsedMeta?: ParseMetaResult) {
+  const btnId = (evt?.target as HTMLElement | null)?.id;
+  if (btnId === "+track" && tracking.value) {
     stopResolve?.(true);
     return;
   }
   installable.value = false;
   try {
-    const { update } = await sendCmdDirectly('ParseScript', {
-      ...parsedMeta,
+    const { update } = (await sendCmdDirectly("ParseScript", {
+      ...(parsedMeta || {}),
       code: code.value,
       url: infoVal.url,
       from: infoVal.from,
@@ -432,20 +563,20 @@ async function installScript(evt, parsedMeta) {
       cache: resourceCache,
       reloadTab: reloadTab.value,
       bumpDate: true,
-      id: tracking.value && lastScriptId,
-    });
-    const time = new Date().toLocaleTimeString(['fr']);
+      id: tracking.value ? lastScriptId : undefined,
+    })) as ParseScriptResult;
+    const time = new Date().toLocaleTimeString(["fr"]);
     const time0 = confirmedTime || (confirmedTime = time);
-    message.value = `${update.message} ${time0}${time0 === time ? '' : ` --> ${time}`}`;
+    message.value = `${update.message} ${time0}${time0 === time ? "" : ` --> ${time}`}`;
     installed.value = true;
     lastScriptId = update.props.id;
-    if (btnId === '+track') {
-      message.value = i18n('trackEditsNote')
-        + (infoVal.ff >= 68 ? ' ' + i18n('installOptionTrackTooltip') : '');
+    if (btnId === "+track") {
+      message.value =
+        i18n("trackEditsNote") + (infoVal.ff >= 68 ? " " + i18n("installOptionTrackTooltip") : "");
       trackLocalFile();
-    } else if (btnId === '+edit') {
-      location.href = extensionOptionsPage + ROUTE_SCRIPTS + '/' + lastScriptId;
-    } else if (btnId === '+close') {
+    } else if (btnId === "+edit") {
+      location.href = extensionOptionsPage + ROUTE_SCRIPTS + "/" + lastScriptId;
+    } else if (btnId === "+close") {
       closeTab();
     }
   } catch (err) {
@@ -459,8 +590,13 @@ async function trackLocalFile() {
   }
   cachedCodePromise = null; // always re-read because the file may have changed since then
   tracking.value = true;
-  if (fileHandle && fso == null && (fso = global.FileSystemObserver || false)) {
-    fso = new fso(debounce(onFileChanged, 20)); // one write to a file produces several calls
+  const FileSystemObserver = (
+    globalThis as typeof globalThis & {
+      FileSystemObserver?: new (cb: () => unknown) => FileSystemObserverLike;
+    }
+  ).FileSystemObserver;
+  if (fileHandle && fso == null && FileSystemObserver) {
+    fso = new FileSystemObserver(debounce(onFileChanged, 20)); // one write to a file produces several calls
   }
   if (fso) {
     try {
@@ -470,7 +606,9 @@ async function trackLocalFile() {
     }
   }
   while (tracking.value) {
-    trackingPromise = new Promise(cb => { stopResolve = cb; });
+    trackingPromise = new Promise((cb) => {
+      stopResolve = cb;
+    });
     if (await (fso ? trackingPromise : Promise.race([makePause(500), trackingPromise]))) {
       break;
     }
@@ -484,30 +622,36 @@ async function onFileChanged() {
   try {
     await loadData(true);
     const parsedMeta = await parseMeta();
+    if (!parsedMeta) return;
     await loadDeps();
     await installScript(null, parsedMeta);
     sameCode.value = false;
-  } catch (e) { /* NOP */ }
+  } catch (e) {
+    /* NOP */
+  }
 }
 async function checkSameCode() {
-  const { name, namespace } = script.value.meta || {};
-  const old = await sendCmdDirectly('GetScript', { meta: { name, namespace } });
+  const { name, namespace } = script.value?.meta || {};
+  const old = (await sendCmdDirectly("GetScript", {
+    meta: { name, namespace },
+  })) as VMScript | null;
   reinstall.value = !!old;
-  sameCode.value = old && code.value === await sendCmdDirectly('GetScriptCode', old.props.id);
+  sameCode.value =
+    old && code.value === ((await sendCmdDirectly("GetScriptCode", old.props.id)) as string);
 }
 function createFilePort() {
-  filePort = browser.tabs.connect(infoVal.tabId, { name: 'FetchSelf' });
+  filePort = browser.tabs.connect(infoVal.tabId!, { name: "FetchSelf" });
   // DANGER! Don't use filePortResolve directly as it perpetually changes
-  filePort.onMessage.addListener(val => filePortResolve(val));
+  filePort.onMessage.addListener((val) => filePortResolve?.(val as unknown as string | null));
   filePort.onDisconnect.addListener(() => {
     stopResolve?.(true);
     filePort = null;
   });
 }
-function pingFilePort(resolve) {
+function pingFilePort(resolve: (value: string | null) => void) {
   filePortResolve = resolve;
   if (!filePort) createFilePort();
-  filePort.postMessage(null);
+  filePort?.postMessage(null);
 }
 </script>
 

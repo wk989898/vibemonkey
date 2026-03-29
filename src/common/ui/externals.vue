@@ -1,67 +1,98 @@
 <template>
   <div class="edit-externals flex flex-col">
-    <div v-if="!install || all.length > 1" class="select"
-         ref="$list" focusme @keydown="moveIndex" @scroll="saveScroll"
-         :data-has-main="install ? '' : null">
-      <dl v-for="([type, url, fullUrl, contents], i) of all" :key="i"
-          class="flex"
-          :class="{
-            active: index === i,
-            loading: install && i && contents == null,
-            error: contents === false,
-          }"
-          @click="contents !== false && (index = i)">
-        <dt v-text="type"/>
+    <div
+      v-if="!install || all.length > 1"
+      class="select"
+      ref="$list"
+      focusme
+      @keydown="moveIndex"
+      @scroll="saveScroll"
+      :data-has-main="install ? '' : null"
+    >
+      <dl
+        v-for="([type, url, fullUrl, contents], i) of all"
+        :key="i"
+        class="flex"
+        :class="{
+          active: index === i,
+          loading: install && i && contents == null,
+          error: contents === false,
+        }"
+        @click="contents !== false && (index = i)"
+      >
+        <dt v-text="type" />
         <dd class="ellipsis flex-1">
           <a :href="fullUrl" target="_blank">&nearr;</a>
-          <span v-text="decodeURIComponent(url)"/>
+          <span v-text="decodeURIComponent(url)" />
         </dd>
-        <dd v-if="contents" v-text="formatLength(contents, type)" class="ml-2"/>
+        <dd v-if="contents" v-text="formatLength(contents, type)" class="ml-2" />
       </dl>
     </div>
     <div class="contents pos-rel flex-1">
       <KeepAlive :key="data.key" :max="10" ref="$body">
-      <img v-if="data.img" :src="data.img">
-      <VmCode
-        v-else
-        class="abs-full"
-        :value="data.code"
-        ref="$code"
-        readOnly
-        :cm-options="cmOptions"
-        :mode="data.mode"
-        :commands="{...commands, close: () => $list?.focus() }"
-        :active="isActive && !data.img"
-      />
+        <img v-if="data.img" :src="data.img" />
+        <VmCode
+          v-else
+          class="abs-full"
+          :value="data.code"
+          ref="$code"
+          readOnly
+          :cm-options="cmOptions"
+          :mode="data.mode"
+          :commands="{ ...commands, close: () => $list?.focus() }"
+          :active="isActive && !data.img"
+        />
       </KeepAlive>
     </div>
   </div>
 </template>
 
-<script setup>
-import { computed, nextTick, onActivated, onDeactivated, ref, watch, watchEffect } from 'vue';
-import { dataUri2text, formatByteLength, getFullUrl, i18n, makeDataUri, sendCmdDirectly }
-  from '@/common';
-import VmCode from '@/common/ui/code';
-import { focusMe, hasKeyModifiers } from '@/common/ui/index';
+<script setup lang="ts">
+import { computed, nextTick, onActivated, onDeactivated, ref, watch, watchEffect } from "vue";
+import {
+  dataUri2text,
+  formatByteLength,
+  getFullUrl,
+  i18n,
+  makeDataUri,
+  sendCmdDirectly,
+} from "@/common";
+import VmCode from "@/common/ui/code.vue";
+import { focusMe, hasKeyModifiers } from "@/common/ui/index";
 
-const props = defineProps(['value', 'cmOptions', 'commands', 'install', 'updatedDep']);
-const $body = ref();
-const $code = ref();
-const $list = ref();
-const isActive = ref();
-const dependencies = ref({});
+type ExternalInstall = {
+  code?: string;
+  deps?: Record<string, string>;
+  url?: string;
+};
+
+type ExternalScript = VMScript & {
+  custom: VMScript["custom"] & { pathMap?: StringMap };
+};
+
+const props = defineProps<{
+  value: ExternalScript;
+  cmOptions?: Record<string, unknown>;
+  commands?: Record<string, unknown>;
+  install?: ExternalInstall;
+  updatedDep?: string;
+}>();
+const $body = ref<any>(null);
+const $code = ref<any>(null);
+const $list = ref<HTMLElement | null>(null);
+const isActive = ref(false);
+const dependencies = ref<Record<string, string | null>>({});
 const index = ref(0);
-const data = ref({});
+const data = ref<Record<string, any>>({});
 
 const all = computed(() => {
   const { code, deps = dependencies.value, url: mainUrl } = props.install || {};
   const { custom: { pathMap = {} } = {}, meta } = props.value;
   const { require = [], resources = {} } = meta || {};
   return [
-    ...mainUrl ? [[i18n('editNavCode'), mainUrl, code]] : [],
-    ...require.map(url => [
-      '@require',
+    ...(mainUrl ? [[i18n("editNavCode"), mainUrl, code]] : []),
+    ...require.map((url) => [
+      "@require",
       url,
       pathMap[url] || getFullUrl(url, mainUrl),
       deps[`0${url}`],
@@ -84,41 +115,50 @@ const MOVEMENT = {
   End: 1e9,
   Enter: 0,
 };
-const scrollIntoViewIfNeeded = Element.prototype.scrollIntoViewIfNeeded
-|| function (center = true) {
-  const parent = this.parentElement.getBoundingClientRect();
-  const me = this.getBoundingClientRect();
-  if (me.bottom > parent.bottom || me.top < parent.top) {
-    this.scrollIntoView(center ? { block: 'center' } : undefined);
-  }
-};
-let listScrollTop;
+const scrollIntoViewIfNeeded =
+  (
+    Element.prototype as any as {
+      scrollIntoViewIfNeeded?: (center?: boolean) => void;
+    }
+  ).scrollIntoViewIfNeeded ||
+  function (this: Element, center = true) {
+    const parent = this.parentElement.getBoundingClientRect();
+    const me = this.getBoundingClientRect();
+    if (me.bottom > parent.bottom || me.top < parent.top) {
+      this.scrollIntoView(center ? { block: "center" } : undefined);
+    }
+  };
+let listScrollTop = 0;
 
 defineExpose({
   $code, // used by parent
 });
 onActivated(() => {
   isActive.value = true;
-  ($list.value || {}).scrollTop = listScrollTop || 0;
+  if ($list.value) $list.value.scrollTop = listScrollTop || 0;
 });
 onDeactivated(() => {
   isActive.value = false;
 });
-watch(() => props.updatedDep, url => {
-  const [, currentUrl] = all.value[index.value];
-  const deps = dependencies.value;
-  deps[0 + url] = deps[1 + url] = null;
-  if (url === currentUrl) update();
-});
+watch(
+  () => props.updatedDep,
+  (url) => {
+    if (!url) return;
+    const [, currentUrl] = all.value[index.value];
+    const deps = dependencies.value;
+    deps[0 + url] = deps[1 + url] = null;
+    if (url === currentUrl) update();
+  },
+);
 watchEffect(update);
 
 async function update() {
-  const [type, url] = all.value[index.value];
+  const [type, url] = all.value[index.value] || [];
   if (!url) return;
   const { install } = props;
   const isMain = install && !index.value;
-  const isDataUri = url.startsWith('data:');
-  const isReq = !isMain && !isDataUri && type === '@require';
+  const isDataUri = url.startsWith("data:");
+  const isReq = !isMain && !isDataUri && type === "@require";
   const depsUrl = `${+!isReq}${url}`;
   let code;
   let contentType;
@@ -134,19 +174,20 @@ async function update() {
       if (!isReq) raw = makeDataUri(raw);
     } else {
       const key = props.value.custom.pathMap?.[url] || url;
-      raw = await sendCmdDirectly('Storage', [isReq ? 'require' : 'cache', 'getOne', key]);
+      raw = await sendCmdDirectly("Storage", [isReq ? "require" : "cache", "getOne", key]);
       if (!isReq) raw = makeDataUri(raw, key);
     }
     if (isReq || !raw) {
       code = raw;
-    } else if (raw.startsWith('data:image')) {
+    } else if (raw.startsWith("data:image")) {
       img = raw;
     } else {
-      [contentType, code] = raw.split(',');
-      if (code == null) { // workaround for bugs in old VM, see 2e135cf7
-        const fileExt = url.match(/\.(\w+)([#&?]|$)/)?.[1] || '';
+      [contentType, code] = raw.split(",");
+      if (code == null) {
+        // workaround for bugs in old VM, see 2e135cf7
+        const fileExt = url.match(/\.(\w+)([#&?]|$)/)?.[1] || "";
         contentType = /^(png|jpe?g|bmp|svgz?|gz|zip)$/i.test(fileExt)
-          ? ''
+          ? ""
           : `text/${fileExt.toLowerCase()}`;
       } else if (contentType) {
         contentType = contentType.split(/[:;]/)[1];
@@ -158,19 +199,19 @@ async function update() {
     img,
     code,
     key: depsUrl,
-    mode: contentType === 'text/css' || /\.css([#&?]|$)/i.test(url) ? 'css' : null,
+    mode: contentType === "text/css" || /\.css([#&?]|$)/i.test(url) ? "css" : null,
   };
   dependencies.value[depsUrl] = img || code;
 }
 
 function formatLength(str, type) {
   let len = str?.length;
-  if (type.startsWith('@resource')) {
-    len = Math.round((len - str.indexOf(',') - 1) * 6 / 8); // base64 uses 6 bits out of 8
+  if (type.startsWith("@resource")) {
+    len = Math.round(((len - str.indexOf(",") - 1) * 6) / 8); // base64 uses 6 bits out of 8
   }
-  return formatByteLength(len);
+  return formatByteLength(len, false);
 }
-async function moveIndex(evt) {
+async function moveIndex(evt: KeyboardEvent) {
   if (hasKeyModifiers(evt)) return;
   const delta = MOVEMENT[evt.key];
   if (delta === 0 && !data.value.img) focusMe($body.value.$el);
@@ -178,11 +219,9 @@ async function moveIndex(evt) {
   evt.preventDefault();
   const i = index.value + delta;
   const len = all.value.length;
-  index.value = delta < -1 || delta > 1
-      ? Math.max(0, Math.min(len - 1, i))
-      : (i + len) % len;
+  index.value = delta < -1 || delta > 1 ? Math.max(0, Math.min(len - 1, i)) : (i + len) % len;
   await nextTick();
-  $list.value.querySelector('.active')::scrollIntoViewIfNeeded();
+  scrollIntoViewIfNeeded.call($list.value!.querySelector(".active") as Element);
 }
 function saveScroll() {
   listScrollTop = $list.value.scrollTop;
@@ -205,8 +244,8 @@ $mainEntryBorder: 6px double;
       text-decoration: underline;
     }
     &[data-has-main] dl:first-child {
-      padding-top: .5em;
-      padding-bottom: .5em;
+      padding-top: 0.5em;
+      padding-bottom: 0.5em;
       border-bottom: 1px solid var(--fill-3);
       position: sticky;
       top: 0;
@@ -242,7 +281,7 @@ $mainEntryBorder: 6px double;
       font-family: monospace;
     }
     a {
-      padding: 0 .5em;
+      padding: 0 0.5em;
       cursor: alias;
       &:hover {
         background: var(--fill-3);

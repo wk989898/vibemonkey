@@ -248,7 +248,7 @@ extDescription:
   message: Ein quelloffener Benutzerskript-Manager, der viele Browser unterstützt.
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: In den Violentmonkey-Einstellungen geblacklistet
@@ -339,7 +339,7 @@ hintForBatchAction:
   message: für $1 gematchte Skripte
 hintGrantNone:
   description: Don't translate back-quoted terms.
-  message: '''@grant none'' deaktiviert alle anderen ''grant''-Schlüssel.'
+  message: "'@grant none' deaktiviert alle anderen 'grant'-Schlüssel."
 hintGrantless:
   description: >-
     1) This is a tooltip so preserve the line breaks to ensure it's not too
@@ -1086,7 +1086,7 @@ titleSearchHintV2:
     * Negativsuche: <code>!#tag2 !name:"unwanted"</code>
 
     * Reguläre Ausdrücke: <code>/\w+?/</code>, <code>/\w+?/gi</code>,
-    <code>name:/\w+?/</code>, <code>name+re::"\w+? with space"</code>
+    <code>name:/\w+?/</code>, <code>name+re:"\w+? with space"</code>
 toggleInjection:
   description: Label for a keyboard shortcut.
   message: Benutzerskript-Injektion umschalten

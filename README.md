@@ -1,13 +1,13 @@
-# Violentmonkey
+# VibeMonkey
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/jinjaccalgkegednnccohejagnlnfdag.svg)](https://chrome.google.com/webstore/detail/violentmonkey/jinjaccalgkegednnccohejagnlnfdag)
 [![Firefox Add-ons](https://img.shields.io/amo/v/violentmonkey.svg)](https://addons.mozilla.org/firefox/addon/violentmonkey)
 [![Microsoft Edge Add-on](https://img.shields.io/badge/dynamic/json?label=microsoft%20edge%20add-on&query=%24.version&url=https%3A%2F%2Fmicrosoftedge.microsoft.com%2Faddons%2Fgetproductdetailsbycrxid%2Feeagobfjdenkkddmbclomhiblgggliao)](https://microsoftedge.microsoft.com/addons/detail/eeagobfjdenkkddmbclomhiblgggliao)
 
-Violentmonkey provides userscripts support for browsers.
+VibeMonkey provides userscripts support for browsers.
 It works on browsers with [WebExtensions](https://developer.mozilla.org/en-US/Add-ons/WebExtensions) support.
 
-More details can be found [here](https://violentmonkey.github.io/).
+More details can be found in the [repository](https://github.com/wk989898/vibemonkey).
 
 Join our Discord server:
 
@@ -15,35 +15,44 @@ Join our Discord server:
 
 ## Automated Builds for Testers
 
-A test build is generated automatically for changes between beta releases. It can be installed as an unpacked extension in Chrome and Chromium-based browsers or as a temporary extension in Firefox. It's likely to have bugs so do an export in Violentmonkey settings first. This zip is available only if you're logged-in on GitHub site. Open an entry in the [CI workflows](https://github.com/violentmonkey/violentmonkey/actions/workflows/ci.yml) table and click the `Violentmonkey-...` link at the bottom to download it.
+A test build is generated automatically for changes between beta releases. It can be installed as an unpacked extension in Chrome and Chromium-based browsers or as a temporary extension in Firefox. It's likely to have bugs so do an export in VibeMonkey settings first. This zip is available only if you're logged-in on GitHub site. Open an entry in the [CI workflows](https://github.com/wk989898/vibemonkey/actions/workflows/ci.yml) table and click the `VibeMonkey-...` link at the bottom to download it.
 
 ## Workflows
 
 ### Development
 
-Install [Node.js](https://nodejs.org/) and Yarn v1.x.
+Install [Node.js](https://nodejs.org/) and npm.
 The version of Node.js should match `"node"` key in `package.json`.
 
-``` sh
+```sh
 # Install dependencies
-$ yarn
+$ npm install
 
-# Watch and compile
-$ yarn dev
+# Watch Firefox MV2 build
+$ npm run dev
+
+# Watch Chrome MV3 build
+$ npm run dev:chrome-mv3
 ```
 
-Then load the extension from 'dist/'.
+Then load the extension from `dist/firefox-mv2/` or `dist/chrome-mv3/`.
 
 ### Build
 
 To release a new version, we must build the assets and upload them to web stores.
 
-``` sh
-# Build for normal releases
-$ yarn build
+```sh
+# Build Firefox MV2
+$ npm run build
+
+# Build Chrome MV3
+$ npm run build:chrome-mv3
 
 # Build for self-hosted release that has an update_url
-$ yarn build:selfHosted
+$ npm run build:selfHosted
+
+# Build all supported targets without overwriting previous output
+$ npm run build:all
 ```
 
 ### Release

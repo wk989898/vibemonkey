@@ -21,7 +21,7 @@ jobs:
           node-version: '20'
 
       - name: Prepare
-        run: yarn && node scripts/action-helper.js
+        run: npm ci && node scripts/action-helper.mjs
         env:
           ACTION_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DISCORD_WEBHOOK_RELEASE: ${{ secrets.DISCORD_WEBHOOK_RELEASE }}

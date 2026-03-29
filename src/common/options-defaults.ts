@@ -1,0 +1,120 @@
+import { BLACKLIST, BLACKLIST_NET, FILE_GLOB_ALL } from "@/common/consts";
+
+export const kAutocompleteOnTyping = "autocompleteOnTyping";
+export const kEditAsString = "editAsString";
+export const kFiltersPopup = "filtersPopup";
+export const kGmCookieHttpOnly = "gmCookieHttpOnly";
+export const kKillTrailingSpaceOnSave = "killTrailingSpaceOnSave";
+export const kPopupWidth = "popupWidth";
+export const kShowTrailingSpace = "showTrailingSpace";
+export const kScriptTemplate = "scriptTemplate";
+export const kUpdateEnabledScriptsOnly = "updateEnabledScriptsOnly";
+export const kValueEditor = "valueEditor";
+const defaultsEditorCommon = {
+  [kAutocompleteOnTyping]: 100,
+  lineWrapping: false,
+  indentWithTabs: false,
+  indentUnit: 2,
+  tabSize: 2,
+  undoDepth: 500,
+};
+export const defaultsEditor = {
+  [kKillTrailingSpaceOnSave]: true,
+  [kShowTrailingSpace]: true,
+  ...defaultsEditorCommon,
+};
+
+const defaults = {
+  [IS_APPLIED]: true,
+  [BLACKLIST]: FILE_GLOB_ALL,
+  [BLACKLIST_NET]: FILE_GLOB_ALL,
+  [kPopupWidth]: 320,
+  [kUpdateEnabledScriptsOnly]: true,
+  [kGmCookieHttpOnly]: false,
+  autoUpdate: 1, // days, 0 = disable
+  // ignoreGrant: false,
+  lastUpdate: 0,
+  lastModified: 0,
+  /** @type {VMBadgeMode} */
+  showBadge: "unique",
+  badgeColor: "#880088",
+  badgeColorBlocked: "#888888",
+  exportValues: true,
+  exportNameTemplate: "[vibemonkey]_YYYY-MM-DD_HH.mm.ss",
+  [EXPOSE]: {
+    // use percent-encoding for '.'
+    "greasyfork%2Eorg": true,
+    "sleazyfork%2Eorg": false,
+  },
+  closeAfterInstall: false,
+  editAfterInstall: false,
+  helpForLocalFile: true,
+  trackLocalFile: false,
+  autoReload: false,
+  features: null,
+  syncScriptStatus: true,
+  syncAutomatically: true,
+  sync: null,
+  customCSS: "",
+  importScriptData: true,
+  importSettings: true,
+  notifyUpdates: false,
+  notifyUpdatesGlobal: false, // `true` ignores script.config.notifyUpdates
+  version: null,
+  /** @type {VMScriptInjectInto} */
+  defaultInjectInto: AUTO,
+  ffInject: true,
+  xhrInject: false,
+  filters: {
+    /** @type {boolean} */
+    showOrder: false,
+    /** @type {boolean} */
+    showVisit: false,
+    /** @type {'exec'|'exec-' | 'alpha'|'alpha-' | 'author'|'author-' | 'update'|'update-' | 'visit'|'visit-'} */
+    sort: "exec",
+    /** @type {boolean} */
+    viewSingleColumn: false,
+    /** @type {boolean} */
+    viewTable: false,
+  },
+  [kFiltersPopup]: {
+    /** @type {'exec' | 'alpha'} */
+    sort: "exec",
+    enabledFirst: false,
+    groupRunAt: true,
+    /** @type {'' | 'hide' | 'group'} where '' = show */
+    hideDisabled: "",
+  },
+  editor: defaultsEditor,
+  editorTheme: "",
+  editorThemeName: null,
+  editorWindow: false, // whether popup opens editor in a new window
+  editorWindowPos: {}, // { left, top, width, height }
+  editorWindowSimple: true, // whether to open a simplified popup or a normal browser window
+  ai: {
+    apiKey: "",
+    apiUrl: "https://api.openai.com/v1/chat/completions",
+    model: "gpt-5.2",
+  },
+  [kScriptTemplate]: `\
+// ==UserScript==
+// @name        New script {{name}}
+// @namespace   ${VIOLENTMONKEY} Scripts
+// @match       {{url}}
+// @icon        {{icon}}
+// @grant       none
+// @version     1.0
+// @author      -
+// @description {{date}}
+// ==/UserScript==
+`,
+  showAdvanced: true,
+  [kValueEditor]: {
+    ...defaultsEditorCommon,
+    [kEditAsString]: true,
+  },
+  /** @type {'' | 'dark' | 'light'} */
+  uiTheme: "",
+};
+
+export default defaults;

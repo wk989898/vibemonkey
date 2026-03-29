@@ -1,37 +1,34 @@
-import { signAddon } from 'amo-upload';
-import { mkdir, rename, writeFile } from 'fs/promises';
-import { join } from 'path';
-import { buildUpdatesList, readManifest } from './manifest-helper.js';
-import { hasAsset, notifyReleaseStatus } from './release-helper.mjs';
-import { getVersion, isBeta } from './version-helper.js';
+import { signAddon } from "amo-upload";
+import { mkdir, rename, writeFile } from "fs/promises";
+import { join } from "path";
+import { buildUpdatesList, readManifest } from "./manifest-helper.mjs";
+import { hasAsset, notifyReleaseStatus } from "./release-helper.mjs";
+import { getVersion, isBeta } from "./version-helper.mjs";
 
 const version = getVersion();
 const beta = isBeta();
 
 async function handleAddon() {
   const manifest = await readManifest();
-  const fileName = `violentmonkey-${version}${beta ? 'b' : ''}.xpi`;
-  const url = `https://github.com/violentmonkey/violentmonkey/releases/download/v${version}/${fileName}`;
+  const fileName = `vibemonkey-${version}${beta ? "b" : ""}.xpi`;
+  const url = `https://github.com/wk989898/vibemonkey/releases/download/v${version}/${fileName}`;
 
   if (await hasAsset(fileName)) {
     // Throw an error so `updates.json` won't be updated in the next step.
-    throw new Error('File already downloaded, skipping');
+    throw new Error("File already downloaded, skipping");
   }
 
-  const tempFile = join(
-    process.env.TEMP_DIR,
-    Math.random().toString(36).slice(2, 8).toString(),
-  );
-  const releaseUrl = `https://github.com/violentmonkey/violentmonkey/releases/tag/v${version}`;
+  const tempFile = join(process.env.TEMP_DIR, Math.random().toString(36).slice(2, 8).toString());
+  const releaseUrl = `https://github.com/wk989898/vibemonkey/releases/tag/v${version}`;
   await signAddon({
     apiKey: process.env.AMO_KEY,
     apiSecret: process.env.AMO_SECRET,
     addonId: manifest.browser_specific_settings.gecko.id,
     addonVersion: version,
-    channel: beta ? 'unlisted' : 'listed',
+    channel: beta ? "unlisted" : "listed",
     compatibility: {
-      android: { min: '121.0a1' },
-      firefox: { min: '57.0' },
+      android: { min: "121.0a1" },
+      firefox: { min: "57.0" },
     },
     ...(process.env.AMO_PUBLISH
       ? {
@@ -41,10 +38,10 @@ async function handleAddon() {
           sourceFile: join(process.env.TEMP_DIR, process.env.SOURCE_ZIP),
           approvalNotes: `\
 # please use nodejs 20 or 24 because nodejs 22 is known to fail
-yarn && yarn build
+npm ci && npm run build
 `,
           releaseNotes: {
-            'en-US': `\
+            "en-US": `\
 Please follow the link below to view the change log:
 
 ${releaseUrl}
@@ -64,9 +61,9 @@ ${releaseUrl}
 
   const updates = await buildUpdatesList(version, url);
   await writeFile(
-    join(process.env.TEMP_DIR, 'updates/updates.json'),
+    join(process.env.TEMP_DIR, "updates/updates.json"),
     JSON.stringify(updates, null, 2),
-    'utf8',
+    "utf8",
   );
 }
 
@@ -75,8 +72,8 @@ async function main() {
   try {
     await handleAddon();
   } catch (err) {
-    if (err?.message === 'Polling skipped') {
-      error = beta ? new Error('Pending review') : undefined;
+    if (err?.message === "Polling skipped") {
+      error = beta ? new Error("Pending review") : undefined;
     } else {
       error = err;
     }
@@ -88,7 +85,7 @@ main().then(
   () => {
     notifyReleaseStatus({
       title: `AMO Release Success: ${process.env.RELEASE_NAME}`,
-      description: `See the changelog at https://github.com/violentmonkey/violentmonkey/releases/tag/v${process.env.VERSION}.`,
+      description: `See the changelog at https://github.com/wk989898/vibemonkey/releases/tag/v${process.env.VERSION}.`,
     });
   },
   (err) => {
@@ -96,13 +93,13 @@ main().then(
     notifyReleaseStatus({
       title: `AMO Release Failure: ${process.env.RELEASE_NAME}`,
       description: [
-        'An error occurred:',
-        '',
+        "An error occurred:",
+        "",
         `> ${err}`,
         ...(process.env.ACTION_BUILD_URL
-          ? ['', `See ${process.env.ACTION_BUILD_URL} for more details.`]
+          ? ["", `See ${process.env.ACTION_BUILD_URL} for more details.`]
           : []),
-      ].join('\n'),
+      ].join("\n"),
       success: false,
     });
     // }

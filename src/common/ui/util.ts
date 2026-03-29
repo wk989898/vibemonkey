@@ -1,0 +1,52 @@
+import options from "@/common/options";
+import hookSetting from "@/common/hook-setting";
+import { debounce } from "@/common";
+import { isMacintosh } from "@violentmonkey/shortcut";
+
+export const NORMALIZE = Symbol();
+export const CTRL_META = isMacintosh ? "⌘" : "Ctrl-";
+export const getSortCollator = () =>
+  new Intl.Collator(undefined, {
+    numeric: true, // 100 > 2
+    sensitivity: "accent", // ignore case
+  });
+
+/** @this {object} enum */
+export function normalizeEnum(this: Record<string, unknown>, val: string) {
+  return hasOwnProperty(this, val) ? val : Object.keys(this)[0];
+}
+
+/**
+ * @param {object} items - source definitions
+ * @param {object} settings - target
+ * @param {function} watch - Vue's watch()
+ * @param {number} [delay] - debounce
+ * @return {any[]}
+ */
+export function hookSettingsForUI(
+  items: Record<
+    string,
+    Record<string | symbol, unknown> | ((value: unknown, key: string) => unknown)
+  >,
+  settings: Record<string, unknown>,
+  watch: (source: () => unknown, cb: (value: unknown, oldValue: unknown) => void) => () => void,
+  delay?: number,
+) {
+  const revokers: Array<() => void> = [];
+  for (const key in items) {
+    const obj = items[key];
+    const normalize = isFunction(obj) ? obj : obj[NORMALIZE] || normalizeEnum.bind(obj);
+    const updater = (val, old) => {
+      val = normalize(val, key);
+      old = normalize(old, key);
+      if (val !== old) options.set(key, val);
+    };
+    revokers.push(
+      hookSetting(key, (val) => {
+        settings[key] = normalize(val, key);
+      }),
+      watch(() => settings[key], delay ? debounce(updater, delay) : updater),
+    );
+  }
+  return revokers;
+}

@@ -249,10 +249,10 @@ extDescription:
     wiele przeglądarek.
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
-  message: ' Zablokowano w czarnej liście w ustawieniach Violentmonkey''a'
+  message: " Zablokowano w czarnej liście w ustawieniach Violentmonkey'a"
 failureReasonNoninjectable:
   description: >-
     Shown for URLs that cannot be processed (same places as

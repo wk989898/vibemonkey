@@ -221,7 +221,7 @@ extDescription:
   message: Oferece suporte a scripts de utilizador para navegadores.
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Na lista negra nas definições do Violentmonkey

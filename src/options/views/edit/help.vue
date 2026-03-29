@@ -1,12 +1,12 @@
 <template>
   <div class="edit-help mb-2c">
     <div>
-      <h3 v-html="i18n('editHelpDocumention')"/>
-      <a :href="API_URL" v-bind="EXTERNAL_LINK_PROPS" v-text="API_TEXT"/>
+      <h3 v-html="i18n('editHelpDocumention')" />
+      <a :href="API_URL" v-bind="EXTERNAL_LINK_PROPS" v-text="API_TEXT" />
     </div>
     <div class="keyboard">
-      <h3 v-text="i18n('editHelpKeyboard')"/>
-      <dl v-for="([key, cmd]) of hotkeys" :key>
+      <h3 v-text="i18n('editHelpKeyboard')" />
+      <dl v-for="[key, cmd] of hotkeys" :key>
         <dt class="monospace-font" v-text="key"></dt>
         <dd v-text="cmd"></dd>
       </dl>
@@ -14,24 +14,24 @@
   </div>
 </template>
 
-<script>
-import { VM_HOME } from '@/common/consts';
-import { EXTERNAL_LINK_PROPS } from '@/common/ui';
+<script lang="ts">
+import { VM_HOME } from "@/common/consts";
+import { EXTERNAL_LINK_PROPS } from "@/common/ui";
 
-const API_URL = VM_HOME + 'api/gm/';
-const API_TEXT = API_URL.split('://')[1];
+const API_URL = VM_HOME + "api/gm/";
+const API_TEXT = API_URL.split("://")[1];
 </script>
 
-<script setup>
-defineProps({
-  hotkeys: Array
-});
+<script setup lang="ts">
+defineProps<{
+  hotkeys: Array<[string, string]>;
+}>();
 </script>
 
 <style>
 .edit-help {
   h3 {
-    margin: .5em 0;
+    margin: 0.5em 0;
   }
   .keyboard {
     column-width: 25em;
@@ -41,11 +41,11 @@ defineProps({
     dl {
       display: flex;
       align-items: center;
-      padding: .25em 0;
+      padding: 0.25em 0;
     }
     dt {
       text-align: right;
-      padding-right: .5em;
+      padding-right: 0.5em;
       flex: 0 40%;
       font-weight: bold;
     }

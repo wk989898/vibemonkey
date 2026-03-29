@@ -1,34 +1,40 @@
 <template>
   <label class="setting-check">
-    <input type="checkbox" v-model="value" :disabled>
+    <input type="checkbox" v-model="value" :disabled />
     <slot>
       <span v-text="label" />
     </slot>
   </label>
 </template>
 
-<script setup>
-import { onBeforeUnmount, ref, watch } from 'vue';
-import options from '../options';
-import hookSetting from '../hook-setting';
+<script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from "vue";
+import options from "../options";
+import hookSetting from "../hook-setting";
 
-const props = defineProps({
-  name: String,
-  label: String,
-  disabled: Boolean,
-  sync: {
-    type: Boolean,
-    default: true,
+const props = withDefaults(
+  defineProps<{
+    name: string;
+    label?: string;
+    disabled?: boolean;
+    sync?: boolean;
+  }>(),
+  {
+    sync: true,
   },
+);
+const emit = defineEmits<{
+  change: [value: unknown];
+}>();
+const value = ref<unknown>();
+const revoke = hookSetting(props.name, (val) => {
+  value.value = val;
 });
-const emit = defineEmits(['change']);
-const value = ref();
-const revoke = hookSetting(props.name, val => { value.value = val; });
 
 defineExpose({
   value,
 });
-watch(value, val => {
+watch(value, (val) => {
   // Maxthon is recognized as Chrome in Vue.js.
   // Due to vuejs/vue#4521, model is updated actually on click.
   // Normally `click` event should be fired before `change` event.
@@ -36,7 +42,7 @@ watch(value, val => {
   // And this is fixed in later versions, so we watch the value instead of
   // listening to `change` event to keep the code consistent.
   if (props.sync) options.set(props.name, val);
-  emit('change', val);
+  emit("change", val);
 });
 onBeforeUnmount(revoke);
 </script>

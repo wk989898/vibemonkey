@@ -1,11 +1,14 @@
 <template>
   <div class="flex flex-col" @focus="cm?.focus()">
-    <div class="editor-code flex-auto" ref="$cmWrapper"/>
-    <div class="frame-block editor-search flex" v-show="search.show"
-         @keydown.esc.exact.stop="clearSearch">
+    <div class="editor-code flex-auto" ref="$cmWrapper" />
+    <div
+      class="frame-block editor-search flex"
+      v-show="search.show"
+      @keydown.esc.exact.stop="clearSearch"
+    >
       <form @submit.prevent="goToLine()">
         <span v-text="i18n('labelLineNumber')"></span>
-        <input type="text" class="w-1" v-model="jumpPos">
+        <input type="text" class="w-1" v-model="jumpPos" />
       </form>
       <form class="flex-1" @submit.prevent="findNext()">
         <span v-text="i18n('labelSearch')"></span>
@@ -31,8 +34,13 @@
       <form class="flex-1" @submit.prevent="replace()" v-if="!readOnly">
         <span v-text="i18n('labelReplace')"></span>
         <!-- id is required for the built-in autocomplete using entered values -->
-        <input class="flex-1" type="search" id="editor-replace" v-model="search.replace"
-               v-bind="!FIELD_SIZING && { style: { width: search.replace.length + INPUT_EXTRA + 'ch' } }">
+        <input
+          class="flex-1"
+          type="search"
+          id="editor-replace"
+          v-model="search.replace"
+          v-bind="!FIELD_SIZING && { style: { width: search.replace.length + INPUT_EXTRA + 'ch' } }"
+        />
         <tooltip :content="tooltips.replace" align="end">
           <button type="submit" v-text="i18n('buttonReplace')"></button>
         </tooltip>
@@ -55,63 +63,66 @@
   </div>
 </template>
 
-<script>
-import 'codemirror/lib/codemirror.css';
-import 'codemirror/addon/comment/continuecomment';
-import 'codemirror/addon/comment/comment';
-import 'codemirror/addon/edit/matchbrackets';
-import 'codemirror/addon/edit/closebrackets';
-import 'codemirror/addon/fold/foldcode';
-import 'codemirror/addon/fold/foldgutter';
-import 'codemirror/addon/fold/foldgutter.css';
-import 'codemirror/addon/fold/brace-fold';
-import 'codemirror/addon/fold/comment-fold';
-import 'codemirror/addon/search/match-highlighter';
-import 'codemirror/addon/search/searchcursor';
-import 'codemirror/addon/selection/active-line';
-import 'codemirror/keymap/sublime';
-import 'codemirror/addon/hint/show-hint.css';
-import 'codemirror/addon/hint/show-hint';
-import 'codemirror/addon/hint/javascript-hint';
-import 'codemirror/addon/hint/anyword-hint';
-import CodeMirror from 'codemirror';
-import { debounce, getUniqId, i18n, sendCmdDirectly } from '@/common';
-import { GM_API_NAMES, GM4_ALIAS } from '@/common/consts';
-import { deepEqual, forEachEntry, objectPick } from '@/common/object';
-import hookSetting from '@/common/hook-setting';
-import options from '@/common/options';
-import './code-autocomplete';
-import cmDefaults from './code-defaults';
-import './code-js-mixed-mode';
-import { killTrailingSpaces } from './code-trailing-spaces';
+<script lang="ts">
+import "codemirror/lib/codemirror.css";
+import "codemirror/addon/comment/continuecomment";
+import "codemirror/addon/comment/comment";
+import "codemirror/addon/edit/matchbrackets";
+import "codemirror/addon/edit/closebrackets";
+import "codemirror/addon/fold/foldcode";
+import "codemirror/addon/fold/foldgutter";
+import "codemirror/addon/fold/foldgutter.css";
+import "codemirror/addon/fold/brace-fold";
+import "codemirror/addon/fold/comment-fold";
+import "codemirror/addon/search/match-highlighter";
+import "codemirror/addon/search/searchcursor";
+import "codemirror/addon/selection/active-line";
+import "codemirror/keymap/sublime";
+import "codemirror/addon/hint/show-hint.css";
+import "codemirror/addon/hint/show-hint";
+import "codemirror/addon/hint/javascript-hint";
+import "codemirror/addon/hint/anyword-hint";
+import CodeMirror from "codemirror";
+import { debounce, getUniqId, i18n, sendCmdDirectly } from "@/common";
+import { GM_API_NAMES, GM4_ALIAS } from "@/common/consts";
+import { deepEqual, forEachEntry, objectPick } from "@/common/object";
+import hookSetting from "@/common/hook-setting";
+import options from "@/common/options";
+import "./code-autocomplete";
+import cmDefaults from "./code-defaults";
+import "./code-js-mixed-mode";
+import { killTrailingSpaces } from "./code-trailing-spaces";
 
 // Make sure this is still the longest line in the doc
-const CTRL_OPEN = getUniqId('\x02'.repeat(256));
-const CTRL_CLOSE = '\x03'.repeat(256);
-const CTRL_RE = new RegExp(`${CTRL_OPEN}(\\d+)${CTRL_CLOSE}`, 'g');
-const PLACEHOLDER_CLS = 'too-long-placeholder';
+const CTRL_OPEN = getUniqId("\x02".repeat(256));
+const CTRL_CLOSE = "\x03".repeat(256);
+const CTRL_RE = new RegExp(`${CTRL_OPEN}(\\d+)${CTRL_CLOSE}`, "g");
+const PLACEHOLDER_CLS = "too-long-placeholder";
 // To identify our CodeMirror markers we're using a Symbol since it's always unique
 const PLACEHOLDER_SYM = Symbol(PLACEHOLDER_CLS);
 const cmCommands = CodeMirror.commands;
 const cmOrigCommands = Object.assign({}, cmCommands);
 const { insertTab, insertSoftTab } = cmCommands;
 /** Using space prefix to show the command at the top of Help list */
-const Esc = ' back / cancel / close / singleSelection';
-const GM4_API_NAMES = GM_API_NAMES.map(s => GM4_ALIAS[s = s.slice(3)] || s);
-const FIELD_SIZING = CSS.supports('field-sizing', 'content');
+const Esc = " back / cancel / close / singleSelection";
+const GM4_API_NAMES = GM_API_NAMES.map((s) => GM4_ALIAS[(s = s.slice(3))] || s);
+const FIELD_SIZING = CSS.supports("field-sizing", "content");
 const INPUT_EXTRA = 1.5 + (IS_FIREFOX ? 0 : 3);
 Object.assign(CodeMirror.keyMap.sublime, {
-  'Shift-Ctrl-/': 'commentSelection',
+  "Shift-Ctrl-/": "commentSelection",
 });
-CodeMirror.registerHelper('hint', 'autoHintWithFallback', (cm, ...args) => {
-  let result = cm.getHelper(cm.getCursor(), 'hint')?.(cm, ...args);
+CodeMirror.registerHelper("hint", "autoHintWithFallback", (cm, ...args) => {
+  let result = cm.getHelper(cm.getCursor(), "hint")?.(cm, ...args);
   // fallback to anyword if default returns nothing (or no default)
   result = result?.list.length ? result : CodeMirror.hint.anyword(cm, ...args);
   if (result) {
-    const { from: { ch, line }, list } = result;
-    const prev = cm.getRange({ch: ch < 3 ? ch : ch - 3, line}, result.to);
+    const {
+      from: { ch, line },
+      list,
+    } = result;
+    const prev = cm.getRange({ ch: ch < 3 ? ch : ch - 3, line }, result.to);
     const prefix = ch < 3 ? prev : prev.slice(3);
-    const v4 = ch >= 3 && prev.startsWith('GM.');
+    const v4 = ch >= 3 && prev.startsWith("GM.");
     if (v4) list.length = 0;
     for (const s of v4 ? GM4_API_NAMES : GM_API_NAMES) {
       if (s.startsWith(prefix) && (v4 || !list.includes(s))) {
@@ -123,15 +134,42 @@ CodeMirror.registerHelper('hint', 'autoHintWithFallback', (cm, ...args) => {
 });
 </script>
 
-<script setup>
-import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from 'vue';
-import Tooltip from 'vueleton/lib/tooltip';
-import ToggleButton from '@/common/ui/toggle-button';
-import { HINT_OPTIONS } from './code-autocomplete';
+<script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from "vue";
+import Tooltip from "vueleton/lib/tooltip";
+import ToggleButton from "@/common/ui/toggle-button.vue";
+import { HINT_OPTIONS } from "./code-autocomplete";
 
-let cm;
-let maxDisplayLength;
-let placeholders = new Map();
+type SearchState = {
+  show: boolean;
+  query: string;
+  queryFilled: boolean | null;
+  replace: string;
+  hasResult: boolean;
+  error: unknown;
+  cursor: any;
+  options: {
+    useRegex: boolean;
+    caseSensitive: boolean;
+  };
+};
+
+type SearchPos = VMSearchOptions["pos"] | "from" | "to";
+type EditorSearchOptions = Omit<VMSearchOptions, "pos"> & {
+  pos?: SearchPos;
+};
+
+type Placeholder = {
+  body: string;
+  el: HTMLSpanElement | null;
+  line: number;
+  ch: number;
+  length: number;
+};
+
+let cm: any;
+let maxDisplayLength = 0;
+let placeholders = new Map<number, Placeholder>();
 let placeholderId = 0;
 
 const props = defineProps({
@@ -142,7 +180,7 @@ const props = defineProps({
   },
   value: {
     type: String,
-    default: '',
+    default: "",
   },
   mode: String,
   commands: {
@@ -151,54 +189,60 @@ const props = defineProps({
   },
   cmOptions: Object,
 });
-const emit = defineEmits(['code-dirty', 'ready']);
+const emit = defineEmits(["code-dirty", "ready"]);
 
-const $cmWrapper = ref();
-const $search = ref();
-const jumpPos = ref('');
-const search = reactive({
+const $cmWrapper = ref<HTMLElement | null>(null);
+const $search = ref<HTMLInputElement | null>(null);
+const jumpPos = ref("");
+const search = reactive<SearchState>({
   show: false,
-  query: '',
-  replace: '',
+  query: "",
+  queryFilled: null,
+  replace: "",
   hasResult: false,
+  error: null,
+  cursor: null,
   options: {
     useRegex: false,
     caseSensitive: false,
   },
 });
 const tooltips = reactive({
-  find: '',
-  findPrev: '',
-  findNext: '',
-  replace: '',
-  replaceAll: '',
+  find: "",
+  findPrev: "",
+  findNext: "",
+  replace: "",
+  replaceAll: "",
 });
-const customCommands = Object.assign({
-  // call own methods explicitly to strip `cm` parameter passed by CodeMirror
-  find: () => find(),
-  findNext: () => findNext(),
-  findPrev: () => findNext(1),
-  replace: () => replace(),
-  replaceAll: () => replace(1),
-  autocomplete() {
-    cm.showHint({ hint: CodeMirror.hint.autoHintWithFallback });
+const customCommands = Object.assign(
+  {
+    // call own methods explicitly to strip `cm` parameter passed by CodeMirror
+    find: () => find(),
+    findNext: () => findNext(),
+    findPrev: () => findNext(1),
+    replace: () => replace(),
+    replaceAll: () => replace(1),
+    autocomplete() {
+      cm.showHint({ hint: CodeMirror.hint.autoHintWithFallback });
+    },
+    [Esc]: () => {
+      if (search.show) {
+        clearSearch();
+      } else {
+        cm.execCommand(cm.listSelections()[1] ? "singleSelection" : "close");
+      }
+    },
+    commentSelection() {
+      cm.blockComment(cm.getCursor("from"), cm.getCursor("to"), { fullLines: false });
+    },
+    insertTab() {
+      // pressing Tab key inside a line with no selection will reuse indent type (tabs/spaces)
+      (cm.options.indentWithTabs ? insertTab : insertSoftTab)(cm);
+    },
   },
-  [Esc]: () => {
-    if (search.show) {
-      clearSearch();
-    } else {
-      cm.execCommand(cm.listSelections()[1] ? 'singleSelection' : 'close');
-    }
-  },
-  commentSelection() {
-    cm.blockComment(cm.getCursor('from'), cm.getCursor('to'), { fullLines: false });
-  },
-  insertTab() {
-    // pressing Tab key inside a line with no selection will reuse indent type (tabs/spaces)
-    (cm.options.indentWithTabs ? insertTab : insertSoftTab)(cm);
-  },
-}, props.commands);
-const reroutedKeys = {};
+  props.commands,
+);
+const reroutedKeys: Record<string, string> = {};
 
 defineExpose({
   get cm() {
@@ -217,19 +261,19 @@ function updateValue(val = props.value) {
 }
 function onBeforeChange(cm, change) {
   if (createPlaceholders(change)) {
-    cm.on('change', onChange); // triggered before DOM is updated
+    cm.on("change", onChange); // triggered before DOM is updated
     change.update?.(null, null, change.text);
   }
   // TODO: remove placeholders that belong to a change beyond `undoDepth`
 }
 function onChange(cm) {
-  cm.off('change', onChange);
+  cm.off("change", onChange);
   renderPlaceholders();
 }
 function onChanges(cm, [{ origin }]) {
   // No need to report if changed externally via props.value
-  if (origin !== 'setValue') {
-    emit('code-dirty', !cm.isClean());
+  if (origin !== "setValue") {
+    emit("code-dirty", !cm.isClean());
   }
 }
 function createPlaceholders(change) {
@@ -242,7 +286,7 @@ function createPlaceholders(change) {
       textLine = getRealContent(textLine);
     }
     len = textLine.length - maxDisplayLength;
-    prefix = len > 0 ? textLine.match(/^\s*/)[0] : '';
+    prefix = len > 0 ? textLine.match(/^\s*/)[0] : "";
     len -= prefix.length;
     if (len > 0 && len - textLine.match(/\s*$/)[0].length > 0) {
       res = true;
@@ -263,15 +307,15 @@ function createPlaceholders(change) {
   return res;
 }
 function renderPlaceholders() {
-  placeholders.forEach(p => {
+  placeholders.forEach((p) => {
     if (!p.el) {
       const { line, ch, body, length } = p;
-      const el = document.createElement('span');
+      const el = document.createElement("span");
       const marker = cm.markText({ line, ch }, { line, ch: ch + length }, { replacedWith: el });
       marker[PLACEHOLDER_SYM] = true;
       el.className = PLACEHOLDER_CLS;
-      el.title = i18n('editLongLineTooltip');
-      el.textContent = `${body.slice(0, maxDisplayLength)}...[${i18n('editLongLine')}]`;
+      el.title = i18n("editLongLineTooltip");
+      el.textContent = `${body.slice(0, maxDisplayLength)}...[${i18n("editLongLine")}]`;
       el.onclick = () => {
         if (!`${window.getSelection()}`) {
           cm.setCursor(marker.find().from);
@@ -284,25 +328,25 @@ function renderPlaceholders() {
 }
 function initialize() {
   maxDisplayLength = cm.options.maxDisplayLength;
-  watchEffect(() => cm.setOption('readOnly', props.readOnly));
+  watchEffect(() => cm.setOption("readOnly", props.readOnly));
   // these are active in all nav tabs
-  cm.setOption('extraKeys', {
+  cm.setOption("extraKeys", {
     Esc,
-    F1: 'showHelp',
-    'Ctrl-Space': 'autocomplete',
+    F1: "showHelp",
+    "Ctrl-Space": "autocomplete",
   });
-  cm.on('keyHandled', (_cm, _name, e) => {
+  cm.on("keyHandled", (_cm, _name, e) => {
     e.stopPropagation();
   });
-  cm.on('changes', onChanges);
-  cm.on('beforeChange', onBeforeChange);
+  cm.on("changes", onChanges);
+  cm.on("beforeChange", onBeforeChange);
   if (props.value) updateValue();
-  emit('ready', cm);
+  emit("ready", cm);
 }
 function onActive(state) {
-  const onOff = state ? 'on' : 'off';
-  cm[onOff]('blur', onKeyDownToggler);
-  cm[onOff]('focus', onKeyDownToggler);
+  const onOff = state ? "on" : "off";
+  cm[onOff]("blur", onKeyDownToggler);
+  cm[onOff]("focus", onKeyDownToggler);
   if (state) {
     Object.assign(cmCommands, customCommands);
   } else {
@@ -313,7 +357,7 @@ function onActive(state) {
       }
     }
   }
-  onKeyDownToggler(cm, { type: state ? 'blur' : '' });
+  onKeyDownToggler(cm, { type: state ? "blur" : "" });
 }
 /* reroute hotkeys back to CM when it isn't focused,
    but ignore `window` blur (`evt` param is absent) */
@@ -321,8 +365,11 @@ function onKeyDownToggler(cm, evt) {
   if (evt) {
     /* DANGER! Using body to precede KeyboardService's target in the bubbling phase.
      * Mainly to prioritize our custom Esc handler. */
-    document.body::(evt.type === 'blur' ? addEventListener : removeEventListener)(
-      'keydown', onKeyDown);
+    (evt.type === "blur" ? addEventListener : removeEventListener).call(
+      document.body,
+      "keydown",
+      onKeyDown,
+    );
   }
 }
 function onKeyDown(e) {
@@ -333,7 +380,7 @@ function onKeyDown(e) {
     cm.execCommand(cmd);
   }
 }
-function findFillQuery(force) {
+function findFillQuery(force = false) {
   if (!search.query || force) {
     const sel = cm.listSelections();
     // use the currently selected text if it's within one line
@@ -346,28 +393,28 @@ function findFillQuery(force) {
   }
 }
 /** @param {VMSearchOptions} opts */
-function doSearch(opts) {
+function doSearch(opts: EditorSearchOptions = {}) {
   search.hasResult = !search.query || !!doSearchInternal({ ...opts, wrapAround: true });
 }
 /**
  * @param {VMSearchOptions} opts
  * @returns {?true}
  */
-function doSearchInternal({ reversed, wrapAround, pos, reuseCursor } = {}) {
+function doSearchInternal({ reversed, wrapAround, pos, reuseCursor }: EditorSearchOptions = {}) {
   const { caseSensitive, useRegex } = search.options;
   let retry = wrapAround ? 2 : 1;
-  if (!pos || typeof pos === 'string') {
-    pos = cm.getCursor(pos || (reversed ? 'from' : 'to'));
+  if (!pos || typeof pos === "string") {
+    pos = cm.getCursor(pos || (reversed ? "from" : "to"));
   }
   do {
     let cur;
     if (reuseCursor) {
       cur = search.cursor;
     } else {
-      let { query } = search;
+      let query: string | RegExp = search.query;
       if (useRegex) {
         try {
-          query = new RegExp(query, caseSensitive ? '' : 'gi');
+          query = new RegExp(query, caseSensitive ? "" : "gi");
           search.error = null;
         } catch (err) {
           search.error = err;
@@ -380,7 +427,7 @@ function doSearchInternal({ reversed, wrapAround, pos, reuseCursor } = {}) {
     while (cur.find(reversed)) {
       const from = cur.from();
       const to = cur.to();
-      if (!cm.findMarks(from, to, m => m[PLACEHOLDER_SYM]).length) {
+      if (!cm.findMarks(from, to, (m) => m[PLACEHOLDER_SYM]).length) {
         reveal(from, to);
         cm.setSelection(from, to, { scroll: false });
         return true;
@@ -397,23 +444,23 @@ function doSearchInternal({ reversed, wrapAround, pos, reuseCursor } = {}) {
 }
 async function find() {
   findFillQuery(true);
-  doSearch({ pos: 'from' });
+  doSearch({ pos: "from" });
   await nextTick();
   const el = $search.value;
-  el.select();
-  el.focus();
+  el?.select();
+  el?.focus();
 }
-function findNext(reversed) {
+function findNext(reversed?: boolean | number) {
   const refocus = !search.query || !cm.hasFocus();
   findFillQuery();
-  doSearch({ reversed });
-  if (refocus) nextTick(() => $search.value.focus());
+  doSearch({ reversed: !!reversed });
+  if (refocus) nextTick(() => $search.value?.focus());
 }
 function clearSearch() {
   search.show = false;
   cm.focus();
 }
-function replace(all) {
+function replace(all?: boolean | number) {
   if (props.readOnly) return; // in case this was invoked via hotkey
   const { replace, query } = search;
   if (!query || !search.show) {
@@ -423,7 +470,7 @@ function replace(all) {
   }
   if (all) {
     cm.operation(() => {
-      let opts = { pos: { line: 0, ch: 0 } };
+      let opts: EditorSearchOptions = { pos: { line: 0, ch: 0 } };
       while (doSearchInternal(opts)) {
         search.cursor.replace(replace);
         opts = { reuseCursor: true };
@@ -431,7 +478,7 @@ function replace(all) {
     });
   } else {
     const { sel } = cm.doc;
-    doSearch({ pos: 'from' });
+    doSearch({ pos: "from" });
     if (sel.somethingSelected() && sel.equals(cm.doc.sel)) {
       cm.replaceSelection(replace);
       doSearch();
@@ -442,13 +489,15 @@ function replace(all) {
 function reveal(from, to) {
   const vpm = cm.options.viewportMargin;
   const { viewFrom, viewTo } = cm.display;
-  const inView = from.line >= viewFrom + vpm
-    && (to.line < viewTo - Math.min(cm.doc.size - viewTo, vpm));
-  cm.scrollIntoView({ from, to },
-    inView ? cm.defaultTextHeight() * 2 : cm.display.wrapper.clientHeight / 2);
+  const inView =
+    from.line >= viewFrom + vpm && to.line < viewTo - Math.min(cm.doc.size - viewTo, vpm);
+  cm.scrollIntoView(
+    { from, to },
+    inView ? cm.defaultTextHeight() * 2 : cm.display.wrapper.clientHeight / 2,
+  );
 }
 function goToLine() {
-  let [line, ch] = jumpPos.value.split(':').map(Number) || [];
+  let [line, ch] = jumpPos.value.split(":").map(Number) || [];
   if (line) {
     line -= 1;
     ch = ch ? ch - 1 : 0;
@@ -460,34 +509,34 @@ function goToLine() {
     cm.focus();
   }
 }
-function onCopy(e) {
+function onCopy(e: ClipboardEvent) {
   // CM already prepared the correct text in DOM selection, which is particularly
   // important when using its lineWiseCopyCut option (on by default)
   const sel = `${getSelection()}` || cm?.getSelection();
   if (!sel) return;
   const text = getRealContent(sel);
-  e.clipboardData.setData('text', text);
+  e.clipboardData?.setData("text", text);
   e.preventDefault();
   e.stopImmediatePropagation();
 }
-function getRealContent(text) {
+function getRealContent(text?: string | null) {
   if (text == null) {
-    text = killTrailingSpaces(cm, placeholders);
+    text = killTrailingSpaces(cm, [...placeholders.values()]);
   }
   if (placeholders.size) {
-    text = text.replace(CTRL_RE, (_, id) => placeholders.get(+id)?.body || '');
+    text = text.replace(CTRL_RE, (_, id) => placeholders.get(+id)?.body || "");
   }
   return text;
 }
-function expandKeyMap(res, ...maps) {
+function expandKeyMap(res?: Record<string, string>, ...maps: any[]) {
   if (!res) {
     const { keyMap, extraKeys } = cm.options;
     maps = [extraKeys, keyMap];
     res = {};
   }
   maps.forEach((map) => {
-    if (typeof map === 'string') map = CodeMirror.keyMap[map];
-    map::forEachEntry(([key, value]) => {
+    if (typeof map === "string") map = CodeMirror.keyMap[map];
+    forEachEntry.call(map, ([key, value]) => {
       if (!res[key] && CodeMirror.commands[value]) {
         res[key] = value;
       }
@@ -499,69 +548,87 @@ function expandKeyMap(res, ...maps) {
 }
 
 watch(() => props.active, onActive);
-watch(() => props.mode, value => {
-  cm.setOption('mode', value || cmDefaults.mode);
-});
+watch(
+  () => props.mode,
+  (value) => {
+    cm.setOption("mode", value || cmDefaults.mode);
+  },
+);
 watch(() => props.value, updateValue);
 
 onMounted(() => {
-  let userOpts = options.get('editor');
-  const theme = options.get('editorThemeName');
-  const internalOpts = props.cmOptions || {};
+  let userOpts = (options.get("editor") as Record<string, any>) || {};
+  const theme = options.get("editorThemeName") as string | undefined;
+  const internalOpts = (props.cmOptions || {}) as Record<string, any>;
   const opts = {
     ...cmDefaults,
     ...userOpts,
-    ...theme && { theme },
+    ...(theme && { theme }),
     ...internalOpts, // internal options passed via `props` have the highest priority
     mode: props.mode || userOpts.mode || cmDefaults.mode,
-  };
+  } as Record<string, any>;
   const cmWrapper = $cmWrapper.value;
   const ho = opts[HINT_OPTIONS];
   const hoWord = ho?.word;
-  if (hoWord) try { ho.word = new RegExp(hoWord); } catch {/**/}
+  if (hoWord)
+    try {
+      ho.word = new RegExp(hoWord);
+    } catch {
+      /**/
+    }
   cm = CodeMirror(cmWrapper, opts);
   initialize();
   onActive(true); // DANGER! Must precede expandKeyMap.
-  expandKeyMap()::forEachEntry(([key, cmd]) => {
+  forEachEntry.call(expandKeyMap(), ([key, cmd]) => {
     if (cmd in tooltips) {
-      tooltips[cmd] += `${tooltips[cmd] ? ', ' : ''}${key}`;
+      tooltips[cmd] += `${tooltips[cmd] ? ", " : ""}${key}`;
       reroutedKeys[key] = cmd;
     }
   });
   // pressing Tab key inside a line with no selection will reuse indent size
   if (!opts.tabSize) cm.options.tabSize = cm.options.indentUnit;
-  cmWrapper::addEventListener('copy', onCopy);
-  hookSetting('editor', (newUserOpts) => {
+  cmWrapper?.addEventListener("copy", onCopy);
+  hookSetting("editor", (newUserOpts) => {
+    const nextUserOpts = (newUserOpts || {}) as Record<string, any>;
     // Use defaults for keys that were present in the old userOpts but got deleted in newUserOpts
-    ({ ...cmDefaults, ...newUserOpts })::forEachEntry(([key, val]) => {
-      if ((key in newUserOpts || key in userOpts)
-      && !(key in internalOpts)
-      && !deepEqual(cm.getOption(key), val)) {
+    forEachEntry.call({ ...cmDefaults, ...nextUserOpts }, ([key, val]) => {
+      if (
+        (key in nextUserOpts || key in userOpts) &&
+        !(key in internalOpts) &&
+        !deepEqual(cm.getOption(key), val)
+      ) {
         cm.setOption(key, val);
       }
     });
-    userOpts = newUserOpts;
+    userOpts = nextUserOpts;
   });
-  sendCmdDirectly('Storage', ['base', 'getOne', 'editorSearch']).then(prev => {
+  sendCmdDirectly("Storage", ["base", "getOne", "editorSearch"]).then((prev) => {
     const saveSearchLater = debounce(() => {
-      sendCmdDirectly('Storage', ['base', 'setOne', 'editorSearch',
-        objectPick(search, ['query', 'replace', 'options'])]);
+      sendCmdDirectly("Storage", [
+        "base",
+        "setOne",
+        "editorSearch",
+        objectPick(search, ["query", "replace", "options"]),
+      ]);
     }, 500);
     const searchAgain = () => {
       saveSearchLater();
-      doSearch({ pos: 'from' });
+      doSearch({ pos: "from" });
     };
-    if (prev) Object.assign(search, prev);
-    watch(() => search.query, () => {
-      if (!search.queryFilled) searchAgain();
-      else search.queryFilled = null;
-    });
+    if (prev) Object.assign(search, prev as Partial<SearchState>);
+    watch(
+      () => search.query,
+      () => {
+        if (!search.queryFilled) searchAgain();
+        else search.queryFilled = null;
+      },
+    );
     watch(() => search.options, searchAgain, { deep: true });
     watch(() => search.replace, saveSearchLater);
   });
-  hookSetting('editorThemeName', val => {
+  hookSetting("editorThemeName", (val) => {
     if (val != null && val !== cm.options.theme) {
-      cm.setOption('theme', val);
+      cm.setOption("theme", `${val}`);
     }
   });
   updateValue();

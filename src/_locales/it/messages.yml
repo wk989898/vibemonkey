@@ -252,7 +252,7 @@ extDescription:
   message: Un gestore di userscript open source che supporta un sacco di browser
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Aggiunto alla lista nera nelle impostazioni di Violentmonkey

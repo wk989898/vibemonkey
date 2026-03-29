@@ -240,7 +240,7 @@ extDescription:
   message: Egy nyílt forráskódú userscript menedzser, ami rengeteg böngészőt támogat!
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Ez az oldal szerepel a Violentmonkey beállításainak feketelistáján

@@ -21,7 +21,7 @@ jobs:
           node-version: '20'
 
       - name: Prepare
-        run: yarn && node scripts/action-helper.js
+        run: npm ci && node scripts/action-helper.mjs
         env:
           ACTION_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DISCORD_WEBHOOK_RELEASE: ${{ secrets.DISCORD_WEBHOOK_RELEASE }}
@@ -34,8 +34,8 @@ jobs:
           SYNC_ONEDRIVE_CLIENT_ID: ${{ secrets.SYNC_ONEDRIVE_CLIENT_ID }}
         run: |
           mkdir -p $ASSETS_DIR
-          yarn build
-          cd dist && zip -r ../$ASSETS_DIR/$ASSET_ZIP . && cd ..
+          npm run build:chrome-mv3
+          cd dist/chrome-mv3 && zip -r ../../$ASSETS_DIR/$ASSET_CHROME_ZIP . && cd ../..
 
       - uses: denoland/setup-deno@v2
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Publish to Edge
         run: |
           if [ "$PRERELEASE" != "true" ]; then
-            deno run -A https://raw.githubusercontent.com/violentmonkey/publish-edge-ext/main/main.ts $ASSETS_DIR/$ASSET_ZIP
+            deno run -A https://raw.githubusercontent.com/violentmonkey/publish-edge-ext/main/main.ts $ASSETS_DIR/$ASSET_CHROME_ZIP
           else
             echo Skip BETA for Edge
           fi

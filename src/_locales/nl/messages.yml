@@ -24,7 +24,7 @@ buttonDisable:
   message: Uitschakelen
 buttonDownloadThemes:
   description: Button in Violentmonkey settings for editor.
-  message: 'Thema''s downloaden:'
+  message: "Thema's downloaden:"
   touched: false
 buttonEdit:
   description: Button to edit a script.
@@ -245,7 +245,7 @@ extDescription:
   message: Een open source gebruikersscriptbeheerder voor diverse webbrowsers
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Staat op Violentmonkey's zwarte lijst

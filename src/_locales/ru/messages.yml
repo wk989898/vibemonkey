@@ -246,7 +246,7 @@ extDescription:
     браузеров
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Чёрный список Violentmonkey

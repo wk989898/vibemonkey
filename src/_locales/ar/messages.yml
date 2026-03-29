@@ -245,7 +245,7 @@ extDescription:
   message: مدير سكربتات مفتوح المصدر يدعم العديد من المتصفحات
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: موجود في قائمة الحظر في إعدادات Violentmonkey

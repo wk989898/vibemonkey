@@ -249,7 +249,7 @@ extDescription:
     yöneticisi
 extName:
   description: Name of this extension.
-  message: Violentmonkey
+  message: VibeMonkey
 failureReasonBlacklisted:
   description: Shown for blacklisted URLs (in the extension icon tooltip, in the popup)
   message: Violentmonkey ayarlarında kara listede
@@ -347,7 +347,7 @@ hintGrantless:
   message: ''
 hintInputURL:
   description: Hint for a prompt box to input URL of a user script.
-  message: 'URL''yi girin:'
+  message: "URL'yi girin:"
 hintRecycleBin:
   description: Hint for recycle bin.
   message: Kaldırılan betikler 7 gün boyunca burada listelenecek ve tutulacaktır.
@@ -445,7 +445,7 @@ labelDonate:
   touched: false
 labelDownloadURL:
   description: Label of script @downloadURL in custom meta data.
-  message: 'İndirme URL''si:'
+  message: "İndirme URL'si:"
 labelEditValue:
   description: Label shown in the panel to edit a script value.
   message: Betik değerini düzenliyorsunuz
@@ -495,7 +495,7 @@ labelHomepage:
   message: Ana sayfa
 labelHomepageURL:
   description: Label of script @homepageURL in custom meta data.
-  message: 'Ana sayfa URL''si:'
+  message: "Ana sayfa URL'si:"
 labelHttpOnlyCookie:
   description: Option in Advanced settings to enable HTTP-only cookies for GM_cookie.
   message: ''
@@ -504,7 +504,7 @@ labelHttpOnlyCookieHint:
   message: ''
 labelIconURL:
   description: Label for the input.
-  message: 'Simge URL''si:'
+  message: "Simge URL'si:"
 labelImportScriptData:
   description: Option to import script data along with scripts.
   message: Betik verilerini içeri aktar
@@ -640,7 +640,7 @@ labelSyncScriptStatus:
   message: Betik durumunu eşitle
 labelSyncServerUrl:
   description: Label for input to hold server URL.
-  message: 'Sunucu URL''si: '
+  message: "Sunucu URL'si: "
 labelSyncService:
   description: Label for sync service select.
   message: Eşitleme hizmeti
@@ -659,7 +659,7 @@ labelTranslator:
   touched: false
 labelUpdateURL:
   description: Label of script @updateURL in custom meta data.
-  message: 'Güncelleme URL''si:'
+  message: "Güncelleme URL'si:"
 labelViewSingleColumn:
   description: >-
     Label for option in dashboard script list to show the scripts in single
