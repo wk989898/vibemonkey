@@ -16,6 +16,8 @@ const MAX_CONTEXT_BLOCKS = 12;
 const MAX_CONTEXT_BLOCK_CHARS = 12000;
 const MAX_SEARCH_MATCHES = 5;
 const MAX_SEARCH_CONTEXT_CHARS = 300;
+const MAX_REQUEST_QUERY_CHARS = 200;
+const MAX_REQUEST_SELECTOR_CHARS = 240;
 const MAX_REQUEST_HTML_CHARS = 12000;
 const MAX_REQUEST_TEXT_CHARS = 12000;
 const MAX_REQUEST_SCRIPT_CHARS = 12000;
@@ -218,11 +220,19 @@ type SavedScriptResponse = {
   name?: string;
 };
 
+type PageToolCallPayload = {
+  args?: Record<string, unknown>;
+  name?: string;
+};
+
 addBackgroundHandlers(
   {
     AiOpenPanel() {
       showPanel();
       return true;
+    },
+    AiResolvePageTool(payload: PageToolCallPayload) {
+      return resolvePageToolCall(payload);
     },
     [AI_STREAM_EVENT](payload: AiStreamPayload) {
       const requestId = `${payload?.requestId || ""}`;
@@ -629,6 +639,98 @@ function resolveContextRequests(requests) {
   );
 }
 
+function resolvePageToolCall(payload: PageToolCallPayload) {
+  const request = normalizeToolRequest(payload?.name, payload?.args);
+  return (
+    resolveContextRequest(request) ||
+    makeToolResultBlock(
+      "tool-error",
+      "AI page tool error",
+      `Unsupported or invalid tool call: ${payload?.name || "(unknown)"}.`,
+    )
+  );
+}
+
+function normalizeToolRequest(name: string | undefined, args: Record<string, unknown> | undefined) {
+  const kind =
+    {
+      get_html: "getHtml",
+      get_script_tag: "getScriptTag",
+      get_selection: "getSelection",
+      get_text: "getText",
+      search_html: "searchHtml",
+      search_script_tags: "searchScriptTags",
+      search_text: "searchText",
+    }[`${name || ""}`] || "";
+  if (!kind) {
+    return null;
+  }
+  const renamedArgs = {};
+  Object.entries(args || {}).forEach(([key, value]) => {
+    renamedArgs[
+      {
+        context_chars: "contextChars",
+        max_chars: "maxChars",
+        max_matches: "maxMatches",
+      }[key] || key
+    ] = value;
+  });
+  return normalizeToolRequestPayload({
+    kind,
+    ...renamedArgs,
+  });
+}
+
+function normalizeToolRequestPayload(request) {
+  const kind = `${request?.kind || ""}`.trim();
+  if (!kind) {
+    return null;
+  }
+  if (kind === "searchHtml" || kind === "searchText" || kind === "searchScriptTags") {
+    const query = summarizeText(request.query, MAX_REQUEST_QUERY_CHARS);
+    if (!query) {
+      return null;
+    }
+    return {
+      kind,
+      query,
+      maxMatches: clampNumber(request.maxMatches, 1, MAX_SEARCH_MATCHES, 3),
+      contextChars: clampNumber(request.contextChars, 60, MAX_SEARCH_CONTEXT_CHARS, 160),
+    };
+  }
+  if (kind === "getHtml" || kind === "getText") {
+    const selector = summarizeText(request.selector, MAX_REQUEST_SELECTOR_CHARS);
+    if (!selector) {
+      return null;
+    }
+    return {
+      kind,
+      selector,
+      index: clampNumber(request.index, 0, 20, 0),
+      maxChars: clampNumber(
+        request.maxChars,
+        200,
+        kind === "getHtml" ? MAX_REQUEST_HTML_CHARS : MAX_REQUEST_TEXT_CHARS,
+        4000,
+      ),
+    };
+  }
+  if (kind === "getScriptTag") {
+    return {
+      kind,
+      index: clampNumber(request.index, 0, 999, 0),
+      maxChars: clampNumber(request.maxChars, 200, MAX_REQUEST_SCRIPT_CHARS, 6000),
+    };
+  }
+  if (kind === "getSelection") {
+    return {
+      kind,
+      maxChars: clampNumber(request.maxChars, 100, 4000, 1000),
+    };
+  }
+  return null;
+}
+
 function resolveContextRequest(request) {
   switch (`${request?.kind || ""}`) {
     case "searchHtml":
@@ -667,6 +769,15 @@ function resolveContextRequest(request) {
     default:
       return null;
   }
+}
+
+function makeToolResultBlock(key: string, title: string, content: string) {
+  return {
+    key,
+    title,
+    mime: "text/plain",
+    content,
+  };
 }
 
 function makeSearchBlock(keyPrefix, title, source, query, maxMatches, contextChars) {

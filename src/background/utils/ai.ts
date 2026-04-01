@@ -1,6 +1,7 @@
 import { getScriptName, getScriptRunAt, ignoreNoReceiver, sendTabCmd } from "@/common";
 import { AI_STREAM_EVENT, type AiStreamPayload } from "@/common/ai-stream";
 import { DEFAULT_AI_API_URL, DEFAULT_AI_MODEL, resolveAiEndpoint } from "@/common/ai-config";
+import { mapEntry } from "@/common/object";
 import { browser } from "@/common/consts";
 import {
   createAiResponseStreamParser,
@@ -36,14 +37,18 @@ const DEFAULT_PAGE_CHAT_SYSTEM_PROMPT = [
   "You are an AI assistant embedded in a live web page via Violentmonkey.",
   "Use selective retrieval to minimize token usage.",
   "You will receive a lightweight page index, matched userscript summaries, and any previously fetched context blocks.",
-  'If you need more context, do not answer yet. Return only a JSON object with {"type":"context_request","requests":[...]} and no extra prose.',
+  "If you need more context, use the provided callable retrieval tools instead of guessing.",
   "Prefer searchHtml, searchText, or searchScriptTags before requesting raw HTML or source code.",
   "Use getUserscript only for matched userscripts listed in the provided summaries.",
   "Use getScriptTag for script tags listed in the page index. External script src files will be fetched on demand.",
-  "Once you have enough information, answer normally and do not output JSON.",
+  "Once you have enough information, answer normally and do not describe tool usage unless the user asks.",
   "Answer only from the supplied context. Do not invent selectors, functions, or page behavior.",
   "If the supplied snippets are truncated, say so and ask a narrower follow-up question.",
   "Reply in the same language as the user when practical.",
+].join("\n");
+const DEFAULT_PAGE_CHAT_LEGACY_SYSTEM_PROMPT = [
+  DEFAULT_PAGE_CHAT_SYSTEM_PROMPT,
+  'If tool calling is unavailable, do not answer yet. Return only a JSON object with {"type":"context_request","requests":[...]} and no extra prose.',
 ].join("\n");
 const CONTEXT_REQUEST_EXAMPLE = JSON.stringify(
   {
@@ -60,6 +65,7 @@ const CONTEXT_REQUEST_EXAMPLE = JSON.stringify(
 );
 const MAX_HISTORY_MESSAGES = 10;
 const MAX_HISTORY_MESSAGE_CHARS = 4000;
+const MAX_CHAT_ROUNDS = 4;
 const MAX_MATCHED_USERSCRIPTS = 12;
 const MAX_CONTEXT_BLOCKS = 12;
 const MAX_CONTEXT_BLOCK_CHARS = 12000;
@@ -73,6 +79,7 @@ const MAX_REQUEST_CONTEXT_CHARS = 300;
 const MAX_USERSCRIPT_CODE_CHARS = 12000;
 const MAX_SCRIPT_SOURCE_CHARS = 12000;
 const MAX_GENERATE_TOOL_TURNS = 4;
+type AiToolSet = "generate_actions" | "page_chat";
 
 addOwnCommands({
   async AiGenerateScript({ prompt, code, requestId, script } = {}, src) {
@@ -156,50 +163,32 @@ addPublicCommands({
     const isTop = !!src?.[kTop];
     const pageIndex = normalizePageIndex(page, src);
     const matchedScripts = getMatchedUserscriptSummaries(pageIndex.url, isTop);
-    const knownContextBlocks = normalizeContextBlocks(contextBlocks);
-    const { data, model } = await callAiApi({
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content: DEFAULT_PAGE_CHAT_SYSTEM_PROMPT,
-        },
-        ...normalizeChatHistory(history),
-        {
-          role: "user",
-          content: buildPageChatPrompt(prompt, pageIndex, matchedScripts, knownContextBlocks),
-        },
-      ],
-      requestId: normalizeRequestId(requestId),
+    const normalizedRequestId = normalizeRequestId(requestId);
+    try {
+      return await runPageChatWithTools({
+        history,
+        isTop,
+        matchedScripts,
+        pageIndex,
+        prompt,
+        requestId: normalizedRequestId,
+        src,
+      });
+    } catch (err) {
+      if (!shouldFallbackFromTools(err)) {
+        throw err;
+      }
+    }
+    return runPageChatLegacy({
+      contextBlocks,
+      history,
+      isTop,
+      matchedScripts,
+      pageIndex,
+      prompt,
+      requestId: normalizedRequestId,
       src,
     });
-    const content = getAiMessageContent(data);
-    const request = parseContextRequest(content);
-    if (request) {
-      const resolved = await resolveBackgroundContextRequests(
-        request.requests,
-        pageIndex,
-        matchedScripts,
-        isTop,
-      );
-      return {
-        type: "contextRequest",
-        requests: resolved.pageRequests,
-        contextBlocks: resolved.contextBlocks,
-        model,
-        usage: data.usage || null,
-      };
-    }
-    return {
-      type: "final",
-      content,
-      model,
-      usage: data.usage || null,
-      context: {
-        matchedUserscripts: matchedScripts,
-        pageUrl: pageIndex.url,
-      },
-    };
   },
 });
 
@@ -239,17 +228,27 @@ function buildPageGeneratePrompt(prompt, pageIndex, matchedScripts) {
   ].join("\n");
 }
 
-function buildPageChatPrompt(prompt, pageIndex, matchedScripts, contextBlocks) {
+function buildPageChatPrompt(
+  prompt,
+  pageIndex,
+  matchedScripts,
+  contextBlocks,
+  includeLegacyProtocol = false,
+) {
   return [
     "User question:",
     prompt,
     "",
-    "Context request protocol:",
-    "Return only JSON when you need more context.",
-    "```json",
-    CONTEXT_REQUEST_EXAMPLE,
-    "```",
-    "",
+    ...(includeLegacyProtocol
+      ? [
+          "Context request protocol:",
+          "Return only JSON when you need more context.",
+          "```json",
+          CONTEXT_REQUEST_EXAMPLE,
+          "```",
+          "",
+        ]
+      : []),
     "Supported request kinds:",
     "- searchHtml: search raw HTML for a keyword or phrase.",
     "- searchText: search visible page text for a keyword or phrase.",
@@ -376,9 +375,138 @@ async function generateScriptWithAiTools({ messages, requestId, src }) {
       }
     });
     previousResponseId = `${data?.id || previousResponseId}`;
-    turnMessages = buildToolResultMessages(data, toolCalls, turnMessages);
+    turnMessages = buildToolResultMessages(
+      data,
+      toolCalls.map((call) => ({
+        callId: call.callId,
+        output: JSON.stringify({
+          accepted: true,
+          name: call.name,
+        }),
+        source: call.source,
+      })),
+      turnMessages,
+    );
   }
   throw new SafeError("AI requested too many action-planning tool rounds.");
+}
+
+async function runPageChatWithTools({
+  history,
+  isTop,
+  matchedScripts,
+  pageIndex,
+  prompt,
+  requestId,
+  src,
+}) {
+  let previousResponseId = "";
+  let turnMessages = [
+    {
+      role: "system",
+      content: DEFAULT_PAGE_CHAT_SYSTEM_PROMPT,
+    },
+    ...normalizeChatHistory(history),
+    {
+      role: "user",
+      content: buildPageChatPrompt(prompt, pageIndex, matchedScripts, []),
+    },
+  ];
+  for (let round = 0; round < MAX_CHAT_ROUNDS; round += 1) {
+    const { data, model } = await callAiApi({
+      temperature: 0.2,
+      messages: turnMessages,
+      previousResponseId,
+      requestId: round ? "" : requestId,
+      src,
+      toolChoice: "auto",
+      toolSet: "page_chat",
+    });
+    const toolCalls = getAiToolCalls(data);
+    if (!toolCalls.length) {
+      const content = getAiMessageContent(data);
+      return {
+        type: "final",
+        content,
+        model,
+        usage: data.usage || null,
+        context: {
+          matchedUserscripts: matchedScripts,
+          pageUrl: pageIndex.url,
+        },
+      };
+    }
+    const toolOutputs = await Promise.all(
+      toolCalls.map((call) =>
+        resolvePageChatToolCall({
+          call,
+          isTop,
+          matchedScripts,
+          pageIndex,
+          src,
+        }),
+      ),
+    );
+    previousResponseId = `${data?.id || previousResponseId}`;
+    turnMessages = buildToolResultMessages(data, toolOutputs, turnMessages);
+  }
+  throw new SafeError("AI requested too many tool rounds.");
+}
+
+async function runPageChatLegacy({
+  contextBlocks,
+  history,
+  isTop,
+  matchedScripts,
+  pageIndex,
+  prompt,
+  requestId,
+  src,
+}) {
+  const knownContextBlocks = normalizeContextBlocks(contextBlocks);
+  const { data, model } = await callAiApi({
+    temperature: 0.2,
+    messages: [
+      {
+        role: "system",
+        content: DEFAULT_PAGE_CHAT_LEGACY_SYSTEM_PROMPT,
+      },
+      ...normalizeChatHistory(history),
+      {
+        role: "user",
+        content: buildPageChatPrompt(prompt, pageIndex, matchedScripts, knownContextBlocks, true),
+      },
+    ],
+    requestId,
+    src,
+  });
+  const content = getAiMessageContent(data);
+  const request = parseContextRequest(content);
+  if (request) {
+    const resolved = await resolveBackgroundContextRequests(
+      request.requests,
+      pageIndex,
+      matchedScripts,
+      isTop,
+    );
+    return {
+      type: "contextRequest",
+      requests: resolved.pageRequests,
+      contextBlocks: resolved.contextBlocks,
+      model,
+      usage: data.usage || null,
+    };
+  }
+  return {
+    type: "final",
+    content,
+    model,
+    usage: data.usage || null,
+    context: {
+      matchedUserscripts: matchedScripts,
+      pageUrl: pageIndex.url,
+    },
+  };
 }
 
 function finalizeGeneratedScriptResponse(data, model) {
@@ -412,7 +540,7 @@ async function callAiApi({
   src?: unknown;
   temperature?: number;
   toolChoice?: "auto";
-  toolSet?: "generate_actions";
+  toolSet?: AiToolSet;
 }) {
   const { apiKey, apiStyle, apiUrl, model } = normalizeAiOptions(getOption("ai"));
   if (!apiKey) {
@@ -715,72 +843,185 @@ function isStreamUnsupportedMessage(message: string) {
 }
 
 function buildAiToolDefinitions(apiStyle, toolSet) {
-  if (toolSet !== "generate_actions") {
+  const definitions =
+    toolSet === "generate_actions"
+      ? [
+          {
+            description: "Apply the generated code to the editor. Call this before returning the final userscript.",
+            name: "apply_code",
+            parameters: {
+              additionalProperties: false,
+              properties: {},
+              required: [],
+              type: "object",
+            },
+          },
+          {
+            description: "Update editor-side script settings only when the user explicitly asks for them.",
+            name: "update_script_settings",
+            parameters: {
+              additionalProperties: false,
+              properties: {
+                description: { type: "string" },
+                enabled: { type: "boolean" },
+                injectInto: {
+                  enum: ["", "auto", "content", "page"],
+                  type: "string",
+                },
+                name: { type: "string" },
+                runAt: {
+                  enum: ["", "document-start", "document-body", "document-end", "document-idle"],
+                  type: "string",
+                },
+                tags: {
+                  items: { type: "string" },
+                  type: "array",
+                },
+              },
+              required: [],
+              type: "object",
+            },
+          },
+          {
+            description: "Save the script when the user explicitly asks to save or install it now.",
+            name: "save_script",
+            parameters: {
+              additionalProperties: false,
+              properties: {
+                mode: {
+                  enum: ["create", "update"],
+                  type: "string",
+                },
+              },
+              required: ["mode"],
+              type: "object",
+            },
+          },
+          {
+            description: "Close the editor only when the user explicitly asks to save and close immediately.",
+            name: "close_editor",
+            parameters: {
+              additionalProperties: false,
+              properties: {},
+              required: [],
+              type: "object",
+            },
+          },
+        ]
+      : toolSet === "page_chat"
+        ? [
+            {
+              description: "Search the raw HTML of the current page for a keyword or phrase.",
+              name: "search_html",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  context_chars: { type: "integer" },
+                  max_matches: { type: "integer" },
+                  query: { type: "string" },
+                },
+                required: ["query"],
+                type: "object",
+              },
+            },
+            {
+              description: "Search the visible page text for a keyword or phrase.",
+              name: "search_text",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  context_chars: { type: "integer" },
+                  max_matches: { type: "integer" },
+                  query: { type: "string" },
+                },
+                required: ["query"],
+                type: "object",
+              },
+            },
+            {
+              description: "Search script tag metadata and inline snippets by keyword.",
+              name: "search_script_tags",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  max_matches: { type: "integer" },
+                  query: { type: "string" },
+                },
+                required: ["query"],
+                type: "object",
+              },
+            },
+            {
+              description: "Fetch outerHTML for a CSS selector on the current page.",
+              name: "get_html",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  index: { type: "integer" },
+                  max_chars: { type: "integer" },
+                  selector: { type: "string" },
+                },
+                required: ["selector"],
+                type: "object",
+              },
+            },
+            {
+              description: "Fetch visible text for a CSS selector on the current page.",
+              name: "get_text",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  index: { type: "integer" },
+                  max_chars: { type: "integer" },
+                  selector: { type: "string" },
+                },
+                required: ["selector"],
+                type: "object",
+              },
+            },
+            {
+              description: "Fetch an inline script tag or an external script source by index.",
+              name: "get_script_tag",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  index: { type: "integer" },
+                  max_chars: { type: "integer" },
+                },
+                required: ["index"],
+                type: "object",
+              },
+            },
+            {
+              description: "Fetch the current page text selection.",
+              name: "get_selection",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  max_chars: { type: "integer" },
+                },
+                required: [],
+                type: "object",
+              },
+            },
+            {
+              description: "Fetch matched userscript code by its listed id.",
+              name: "get_userscript",
+              parameters: {
+                additionalProperties: false,
+                properties: {
+                  id: { type: "integer" },
+                  max_chars: { type: "integer" },
+                },
+                required: ["id"],
+                type: "object",
+              },
+            },
+          ]
+        : null;
+  if (!definitions) {
     return null;
   }
-  const definitions = [
-    {
-      description: "Apply the generated code to the editor. Call this before returning the final userscript.",
-      name: "apply_code",
-      parameters: {
-        additionalProperties: false,
-        properties: {},
-        required: [],
-        type: "object",
-      },
-    },
-    {
-      description: "Update editor-side script settings only when the user explicitly asks for them.",
-      name: "update_script_settings",
-      parameters: {
-        additionalProperties: false,
-        properties: {
-          description: { type: "string" },
-          enabled: { type: "boolean" },
-          injectInto: {
-            enum: ["", "auto", "content", "page"],
-            type: "string",
-          },
-          name: { type: "string" },
-          runAt: {
-            enum: ["", "document-start", "document-body", "document-end", "document-idle"],
-            type: "string",
-          },
-          tags: {
-            items: { type: "string" },
-            type: "array",
-          },
-        },
-        required: [],
-        type: "object",
-      },
-    },
-    {
-      description: "Save the script when the user explicitly asks to save or install it now.",
-      name: "save_script",
-      parameters: {
-        additionalProperties: false,
-        properties: {
-          mode: {
-            enum: ["create", "update"],
-            type: "string",
-          },
-        },
-        required: ["mode"],
-        type: "object",
-      },
-    },
-    {
-      description: "Close the editor only when the user explicitly asks to save and close immediately.",
-      name: "close_editor",
-      parameters: {
-        additionalProperties: false,
-        properties: {},
-        required: [],
-        type: "object",
-      },
-    },
-  ];
   return apiStyle === "responses"
     ? definitions.map((tool) => ({
         type: "function",
@@ -816,14 +1057,11 @@ function getAiToolCalls(data) {
     .filter((item) => item.name);
 }
 
-function buildToolResultMessages(data, toolCalls, previousMessages) {
-  if (toolCalls[0]?.source === "responses") {
-    return toolCalls.map((call) => ({
+function buildToolResultMessages(data, toolOutputs, previousMessages) {
+  if (toolOutputs[0]?.source === "responses") {
+    return toolOutputs.map((call) => ({
       call_id: call.callId,
-      output: JSON.stringify({
-        accepted: true,
-        name: call.name,
-      }),
+      output: call.output,
       type: "function_call_output",
     }));
   }
@@ -835,11 +1073,8 @@ function buildToolResultMessages(data, toolCalls, previousMessages) {
       role: "assistant",
       tool_calls: assistantMessage?.tool_calls || [],
     },
-    ...toolCalls.map((call) => ({
-      content: JSON.stringify({
-        accepted: true,
-        name: call.name,
-      }),
+    ...toolOutputs.map((call) => ({
+      content: call.output,
       role: "tool",
       tool_call_id: call.callId,
     })),
@@ -852,6 +1087,85 @@ function tryParseToolArguments(raw: string) {
   } catch {
     return {};
   }
+}
+
+async function resolvePageChatToolCall({
+  call,
+  isTop,
+  matchedScripts,
+  pageIndex,
+  src,
+}) {
+  const request = normalizeContextRequestFromToolCall(call.name, tryParseToolArguments(call.arguments));
+  let block;
+  if (!request) {
+    return {
+      callId: call.callId,
+      output: "Invalid tool arguments.",
+      source: call.source,
+    };
+  }
+  if (request.kind === "getUserscript") {
+    [block] = await resolveUserscriptRequests([request], pageIndex.url, isTop, matchedScripts);
+  } else if (request.kind === "getScriptTag" && pageIndex.scripts[request.index]?.src) {
+    [block] = await resolveExternalScriptRequests([request], pageIndex.scripts);
+  } else if (src?.tab?.id >= 0) {
+    block = await sendTabCmd(
+      src.tab.id,
+      "AiResolvePageTool",
+      {
+        args: tryParseToolArguments(call.arguments),
+        name: call.name,
+      },
+      src.frameId >= 0 ? { [kFrameId]: src.frameId } : undefined,
+    );
+  }
+  return {
+    callId: call.callId,
+    output: formatToolOutputBlock(block),
+    source: call.source,
+  };
+}
+
+function normalizeContextRequestFromToolCall(name, args) {
+  const mappedName =
+    {
+      get_html: "getHtml",
+      get_script_tag: "getScriptTag",
+      get_selection: "getSelection",
+      get_text: "getText",
+      get_userscript: "getUserscript",
+      search_html: "searchHtml",
+      search_script_tags: "searchScriptTags",
+      search_text: "searchText",
+    }[name] || "";
+  if (!mappedName) {
+    return null;
+  }
+  return normalizeContextRequest(
+    {
+      kind: mappedName,
+      ...mapEntry.call(args || {}, (value, key) => value, (key) =>
+        ({
+          context_chars: "contextChars",
+          max_chars: "maxChars",
+          max_matches: "maxMatches",
+        }[key] || key),
+      ),
+    },
+  );
+}
+
+function formatToolOutputBlock(block) {
+  if (!block) {
+    return "No result.";
+  }
+  return [
+    `Title: ${block.title || "(untitled)"}`,
+    `MIME: ${block.mime || "text/plain"}`,
+    "",
+    block.content || "(empty)",
+  ].join("\n");
 }
 
 function normalizeRequestId(requestId) {
