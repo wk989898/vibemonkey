@@ -72,11 +72,15 @@ class VMStorageArea {
   }
 }
 
+type StorageAreaWithGetKeys = browser.storage.StorageArea & {
+  getKeys?: () => Promise<string[]>;
+};
+
 // TODO: add Firefox version to the comment when https://bugzil.la/1910669 is fixed
-/** @type {() => Promise<string[]>} Chromium 130+ */
-export const getStorageKeys = (
-  api as browser.storage.StorageArea & { getKeys?: () => Promise<string[]> }
-).getKeys;
+/** Chromium 130+ */
+export function getStorageKeys() {
+  return (api as StorageAreaWithGetKeys).getKeys?.call(api);
+}
 export const S_CACHE = "cache";
 export const S_CACHE_PRE = "cac:";
 export const S_CODE = "code";

@@ -147,8 +147,8 @@ addOwnCommands({
 (async () => {
   /** @type {string[]} */
   let allKeys, keys;
-  if (getStorageKeys) {
-    allKeys = await getStorageKeys();
+  allKeys = await getStorageKeys();
+  if (allKeys?.length) {
     // Filtering and creating Map in atomic native code operations instead of js loop
     keys = allKeys
       .join("\n")
@@ -158,7 +158,7 @@ addOwnCommands({
     keys = keys.split(/\n+/);
   }
   const lastVersion =
-    (!getStorageKeys || dbKeys.has(kVersion)) && (await storage.base.getOne(kVersion));
+    (!allKeys || dbKeys.has(kVersion)) && (await storage.base.getOne(kVersion));
   const version = process.env.VM_VER;
   const versionChanged = version !== lastVersion;
   if (!lastVersion) await patchDB();
