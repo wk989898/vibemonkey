@@ -7,7 +7,13 @@ import {
   getAiErrorMessage,
   parseAiResponseBody,
 } from "./ai-response";
-import { extractGeneratePlan, extractGeneratedCode } from "./ai-generate";
+import {
+  buildGeneratePlanFromActions,
+  extractGeneratePlan,
+  extractGeneratedCode,
+  normalizeGenerateToolCall,
+  type AiGeneratePlanAction,
+} from "./ai-generate";
 import { getScriptsByURL, parseScript } from "./db";
 import { addOwnCommands, addPublicCommands } from "./init";
 import { getOption } from "./options";
@@ -19,15 +25,12 @@ const DEFAULT_GENERATE_SYSTEM_PROMPT = [
   "Return a complete userscript file that the user can save immediately.",
   "Always include a valid ==UserScript== metadata block.",
   "Preserve the intent of the existing script unless the user explicitly asks to change it.",
-  'Before the code, return one ```json``` block with {"actions":[...]} describing tool calls.',
-  'Always include {"tool":"apply_code"} as the first action.',
-  'Use {"tool":"update_script_settings","settings":{...}} only when the user explicitly asks to change editor-side settings such as enabled state, tags, @run-at, @inject-into, custom name, or custom description.',
-  'Use {"tool":"save_script","mode":"create"} only when the user explicitly asks to create/save/install a new script now, including saving the current draft as a separate new script.',
-  'Use {"tool":"save_script","mode":"update"} only when the user explicitly asks to save the current script in place.',
-  'Use {"tool":"close_editor"} only when the user explicitly asks to save and close immediately.',
-  'For normal drafting or refactoring without explicit save intent, return only {"actions":[{"tool":"apply_code"}]}.',
-  "After the JSON block, return the code in a single ```javascript``` block.",
-  "Do not add prose outside those blocks.",
+  "Use the callable tools to describe editor actions instead of emitting JSON action blocks in plain text.",
+  "Always call apply_code before returning the final userscript code.",
+  "Call update_script_settings only when the user explicitly asks to change editor-side settings.",
+  "Call save_script only when the user explicitly asks to save or install now.",
+  "Call close_editor only when the user explicitly asks to save and close immediately.",
+  "After the necessary tool calls, return only the final userscript code in one ```javascript``` block and no extra prose.",
 ].join("\n");
 const DEFAULT_PAGE_CHAT_SYSTEM_PROMPT = [
   "You are an AI assistant embedded in a live web page via Violentmonkey.",
@@ -37,10 +40,6 @@ const DEFAULT_PAGE_CHAT_SYSTEM_PROMPT = [
   "Prefer searchHtml, searchText, or searchScriptTags before requesting raw HTML or source code.",
   "Use getUserscript only for matched userscripts listed in the provided summaries.",
   "Use getScriptTag for script tags listed in the page index. External script src files will be fetched on demand.",
-  'If the user asks you to create a userscript, return one ```json``` block with {"actions":[...]} describing tool calls, then one ```javascript``` block with the complete userscript.',
-  'For userscript creation, always include {"tool":"apply_code"} as the first action.',
-  'Use {"tool":"save_script","mode":"create"} only when the user explicitly asks to save, install, or create the script now.',
-  "If you generate a userscript, do not add prose outside the JSON and code blocks.",
   "Once you have enough information, answer normally and do not output JSON.",
   "Answer only from the supplied context. Do not invent selectors, functions, or page behavior.",
   "If the supplied snippets are truncated, say so and ask a narrower follow-up question.",
@@ -73,6 +72,7 @@ const MAX_REQUEST_MATCHES = 5;
 const MAX_REQUEST_CONTEXT_CHARS = 300;
 const MAX_USERSCRIPT_CODE_CHARS = 12000;
 const MAX_SCRIPT_SOURCE_CHARS = 12000;
+const MAX_GENERATE_TOOL_TURNS = 4;
 
 addOwnCommands({
   async AiGenerateScript({ prompt, code, requestId, script } = {}, src) {
@@ -98,6 +98,30 @@ addOwnCommands({
 });
 
 addPublicCommands({
+  async AiGenerateScriptForPage({ prompt, history, page, requestId } = {}, src) {
+    prompt = `${prompt || ""}`.trim();
+    if (!prompt) {
+      throw new SafeError("AI prompt is empty.");
+    }
+    const isTop = !!src?.[kTop];
+    const pageIndex = normalizePageIndex(page, src);
+    const matchedScripts = getMatchedUserscriptSummaries(pageIndex.url, isTop);
+    return generateScriptWithAi({
+      messages: [
+        {
+          role: "system",
+          content: DEFAULT_GENERATE_SYSTEM_PROMPT,
+        },
+        ...normalizeChatHistory(history),
+        {
+          role: "user",
+          content: buildPageGeneratePrompt(prompt, pageIndex, matchedScripts),
+        },
+      ],
+      requestId: normalizeRequestId(requestId),
+      src,
+    });
+  },
   async AiSaveGeneratedScript({ code } = {}) {
     const generated = `${code || ""}`;
     if (!generated.trim()) {
@@ -166,17 +190,6 @@ addPublicCommands({
         usage: data.usage || null,
       };
     }
-    const generated = extractGeneratedCode(content);
-    if (generated.includes("==UserScript==")) {
-      return {
-        type: "script",
-        code: generated,
-        content,
-        model,
-        plan: extractGeneratePlan(content),
-        usage: data.usage || null,
-      };
-    }
     return {
       type: "final",
       content,
@@ -201,6 +214,27 @@ function buildGeneratePrompt(prompt, code, script) {
     "Current userscript code:",
     "```javascript",
     code.trim() || "// No existing script yet.",
+    "```",
+  ].join("\n");
+}
+
+function buildPageGeneratePrompt(prompt, pageIndex, matchedScripts) {
+  return [
+    "Task:",
+    prompt,
+    "",
+    "Create a complete userscript for the current page or workflow.",
+    "Prefer precise metadata such as @match, @run-at, and @grant based on the task and page URL.",
+    "",
+    "Current page index:",
+    JSON.stringify(pageIndex, null, 2),
+    "",
+    "Matched userscripts already active on this page:",
+    JSON.stringify(matchedScripts, null, 2),
+    "",
+    "Current userscript code:",
+    "```javascript",
+    "// No existing script yet.",
     "```",
   ].join("\n");
 }
@@ -293,12 +327,61 @@ function getAiMessageContent(data) {
 }
 
 async function generateScriptWithAi({ messages, requestId, src }) {
+  try {
+    return await generateScriptWithAiTools({
+      messages,
+      requestId,
+      src,
+    });
+  } catch (err) {
+    if (!shouldFallbackFromTools(err)) {
+      throw err;
+    }
+  }
   const { data, model } = await callAiApi({
     temperature: 0.2,
     messages,
     requestId,
     src,
   });
+  return finalizeGeneratedScriptResponse(data, model);
+}
+
+async function generateScriptWithAiTools({ messages, requestId, src }) {
+  const toolPlan: AiGeneratePlanAction[] = [];
+  let previousResponseId = "";
+  let turnMessages = messages;
+  for (let turn = 0; turn < MAX_GENERATE_TOOL_TURNS; turn += 1) {
+    const { data, model } = await callAiApi({
+      temperature: 0.2,
+      messages: turnMessages,
+      previousResponseId,
+      requestId: turn ? "" : requestId,
+      src,
+      toolChoice: "auto",
+      toolSet: "generate_actions",
+    });
+    const toolCalls = getAiToolCalls(data);
+    if (!toolCalls.length) {
+      const result = finalizeGeneratedScriptResponse(data, model);
+      return {
+        ...result,
+        plan: buildGeneratePlanFromActions(toolPlan) || result.plan,
+      };
+    }
+    toolCalls.forEach((call) => {
+      const action = normalizeGenerateToolCall(call.name, tryParseToolArguments(call.arguments));
+      if (action) {
+        toolPlan.push(action);
+      }
+    });
+    previousResponseId = `${data?.id || previousResponseId}`;
+    turnMessages = buildToolResultMessages(data, toolCalls, turnMessages);
+  }
+  throw new SafeError("AI requested too many action-planning tool rounds.");
+}
+
+function finalizeGeneratedScriptResponse(data, model) {
   const content = getAiMessageContent(data);
   const plan = extractGeneratePlan(content);
   const generated = extractGeneratedCode(content);
@@ -314,22 +397,44 @@ async function generateScriptWithAi({ messages, requestId, src }) {
   };
 }
 
-async function callAiApi({ messages, temperature = 0.2, requestId, src }) {
+async function callAiApi({
+  messages,
+  temperature = 0.2,
+  requestId,
+  src,
+  toolChoice,
+  toolSet,
+  previousResponseId = "",
+}: {
+  messages: any[];
+  previousResponseId?: string;
+  requestId?: string;
+  src?: unknown;
+  temperature?: number;
+  toolChoice?: "auto";
+  toolSet?: "generate_actions";
+}) {
   const { apiKey, apiStyle, apiUrl, model } = normalizeAiOptions(getOption("ai"));
   if (!apiKey) {
     throw new SafeError("AI API key is not configured.");
   }
+  const supportsStream = !toolSet;
   try {
-    return await callAiApiStream({
-      apiKey,
-      apiStyle,
-      apiUrl,
-      messages,
-      model,
-      requestId,
-      src,
-      temperature,
-    });
+    if (supportsStream) {
+      return await callAiApiStream({
+        apiKey,
+        apiStyle,
+        apiUrl,
+        messages,
+        model,
+        previousResponseId,
+        requestId,
+        src,
+        temperature,
+        toolChoice,
+        toolSet,
+      });
+    }
   } catch (err) {
     if (!shouldRetryWithoutStream(err)) {
       throw err;
@@ -341,7 +446,10 @@ async function callAiApi({ messages, temperature = 0.2, requestId, src }) {
     apiUrl,
     messages,
     model,
+    previousResponseId,
     temperature,
+    toolChoice,
+    toolSet,
   });
 }
 
@@ -355,20 +463,39 @@ function normalizeAiOptions(options) {
   };
 }
 
-function buildAiRequestBody({ apiStyle, messages, model, temperature, stream }) {
+function buildAiRequestBody({
+  apiStyle,
+  messages,
+  model,
+  previousResponseId,
+  stream,
+  temperature,
+  toolChoice,
+  toolSet,
+}) {
+  const tools = buildAiToolDefinitions(apiStyle, toolSet);
   if (apiStyle === "responses") {
-    const instructions = messages
-      .filter((item) => item?.role === "system")
-      .map((item) => messageContentToText(item.content))
-      .filter(Boolean)
-      .join("\n\n");
+    const instructions = previousResponseId
+      ? ""
+      : messages
+          .filter((item) => item?.role === "system")
+          .map((item) => messageContentToText(item.content))
+          .filter(Boolean)
+          .join("\n\n");
     return {
       model,
       stream,
       temperature,
       ...(instructions && { instructions }),
+      ...(previousResponseId && { previous_response_id: previousResponseId }),
+      ...(toolChoice && { tool_choice: toolChoice }),
+      ...(tools?.length && { tools }),
       input: messages
-        .filter((item) => item?.role === "user" || item?.role === "assistant")
+        .filter((item) =>
+          item?.type === "function_call_output" ||
+          item?.role === "user" ||
+          item?.role === "assistant",
+        )
         .map(buildAiResponsesInputMessage)
         .filter(Boolean),
     };
@@ -378,10 +505,19 @@ function buildAiRequestBody({ apiStyle, messages, model, temperature, stream }) 
     stream,
     temperature,
     messages,
+    ...(toolChoice && { tool_choice: toolChoice }),
+    ...(tools?.length && { tools }),
   };
 }
 
 function buildAiResponsesInputMessage(item) {
+  if (item?.type === "function_call_output") {
+    return {
+      type: "function_call_output",
+      call_id: item.call_id,
+      output: item.output,
+    };
+  }
   const content = messageContentToText(item?.content);
   if (!content) {
     return null;
@@ -403,14 +539,35 @@ function buildAiResponsesInputMessage(item) {
   };
 }
 
-async function callAiApiOnce({ apiKey, apiStyle, apiUrl, messages, model, temperature }) {
+async function callAiApiOnce({
+  apiKey,
+  apiStyle,
+  apiUrl,
+  messages,
+  model,
+  previousResponseId,
+  temperature,
+  toolChoice,
+  toolSet,
+}) {
   const res = await fetch(apiUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildAiRequestBody({ apiStyle, messages, model, temperature, stream: false })),
+    body: JSON.stringify(
+      buildAiRequestBody({
+        apiStyle,
+        messages,
+        model,
+        previousResponseId,
+        stream: false,
+        temperature,
+        toolChoice,
+        toolSet,
+      }),
+    ),
   });
   const raw = await res.text();
   const data = parseAiResponseBody(raw);
@@ -436,9 +593,12 @@ async function callAiApiStream({
   apiUrl,
   messages,
   model,
+  previousResponseId,
   requestId,
   src,
   temperature,
+  toolChoice,
+  toolSet,
 }) {
   const res = await fetch(apiUrl, {
     method: "POST",
@@ -446,7 +606,18 @@ async function callAiApiStream({
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(buildAiRequestBody({ apiStyle, messages, model, temperature, stream: true })),
+    body: JSON.stringify(
+      buildAiRequestBody({
+        apiStyle,
+        messages,
+        model,
+        previousResponseId,
+        stream: true,
+        temperature,
+        toolChoice,
+        toolSet,
+      }),
+    ),
   });
   const parser = createAiResponseStreamParser(res.headers.get("content-type") || "");
   let emittedDelta = false;
@@ -528,9 +699,159 @@ function shouldRetryWithoutStream(err) {
   return !!err?.retryWithoutStream && !err?.emittedDelta;
 }
 
+function shouldFallbackFromTools(err) {
+  const message = `${err?.message || err || ""}`;
+  return (
+    /tool/i.test(message) &&
+    /\b(?:unsupported|not supported|unknown|invalid|unexpected|unrecognized|schema|function)\b/i.test(
+      message,
+    )
+  );
+}
+
 function isStreamUnsupportedMessage(message: string) {
   return /\b(?:stream(?:ing)?|event-stream|sse)\b/i.test(message) &&
     /\b(?:unsupported|not supported|invalid|unknown|unexpected|must be false)\b/i.test(message);
+}
+
+function buildAiToolDefinitions(apiStyle, toolSet) {
+  if (toolSet !== "generate_actions") {
+    return null;
+  }
+  const definitions = [
+    {
+      description: "Apply the generated code to the editor. Call this before returning the final userscript.",
+      name: "apply_code",
+      parameters: {
+        additionalProperties: false,
+        properties: {},
+        required: [],
+        type: "object",
+      },
+    },
+    {
+      description: "Update editor-side script settings only when the user explicitly asks for them.",
+      name: "update_script_settings",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          description: { type: "string" },
+          enabled: { type: "boolean" },
+          injectInto: {
+            enum: ["", "auto", "content", "page"],
+            type: "string",
+          },
+          name: { type: "string" },
+          runAt: {
+            enum: ["", "document-start", "document-body", "document-end", "document-idle"],
+            type: "string",
+          },
+          tags: {
+            items: { type: "string" },
+            type: "array",
+          },
+        },
+        required: [],
+        type: "object",
+      },
+    },
+    {
+      description: "Save the script when the user explicitly asks to save or install it now.",
+      name: "save_script",
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          mode: {
+            enum: ["create", "update"],
+            type: "string",
+          },
+        },
+        required: ["mode"],
+        type: "object",
+      },
+    },
+    {
+      description: "Close the editor only when the user explicitly asks to save and close immediately.",
+      name: "close_editor",
+      parameters: {
+        additionalProperties: false,
+        properties: {},
+        required: [],
+        type: "object",
+      },
+    },
+  ];
+  return apiStyle === "responses"
+    ? definitions.map((tool) => ({
+        type: "function",
+        ...tool,
+      }))
+    : definitions.map((tool) => ({
+        type: "function",
+        function: tool,
+      }));
+}
+
+function getAiToolCalls(data) {
+  const responseCalls = (Array.isArray(data?.output) ? data.output : [])
+    .filter((item) => item?.type === "function_call")
+    .map((item) => ({
+      arguments: `${item?.arguments || ""}`,
+      callId: `${item?.call_id || item?.id || ""}`,
+      name: `${item?.name || ""}`,
+      raw: item,
+      source: "responses",
+    }));
+  if (responseCalls.length) {
+    return responseCalls;
+  }
+  return (Array.isArray(data?.choices?.[0]?.message?.tool_calls) ? data.choices[0].message.tool_calls : [])
+    .map((item) => ({
+      arguments: `${item?.function?.arguments || ""}`,
+      callId: `${item?.id || ""}`,
+      name: `${item?.function?.name || ""}`,
+      raw: item,
+      source: "chat_completions",
+    }))
+    .filter((item) => item.name);
+}
+
+function buildToolResultMessages(data, toolCalls, previousMessages) {
+  if (toolCalls[0]?.source === "responses") {
+    return toolCalls.map((call) => ({
+      call_id: call.callId,
+      output: JSON.stringify({
+        accepted: true,
+        name: call.name,
+      }),
+      type: "function_call_output",
+    }));
+  }
+  const assistantMessage = data?.choices?.[0]?.message;
+  return [
+    ...previousMessages,
+    {
+      content: assistantMessage?.content ?? null,
+      role: "assistant",
+      tool_calls: assistantMessage?.tool_calls || [],
+    },
+    ...toolCalls.map((call) => ({
+      content: JSON.stringify({
+        accepted: true,
+        name: call.name,
+      }),
+      role: "tool",
+      tool_call_id: call.callId,
+    })),
+  ];
+}
+
+function tryParseToolArguments(raw: string) {
+  try {
+    return JSON.parse(raw || "{}");
+  } catch {
+    return {};
+  }
 }
 
 function normalizeRequestId(requestId) {

@@ -1,4 +1,5 @@
 import { AI_STREAM_EVENT, type AiStreamPayload } from "@/common/ai-stream";
+import { promptRequestsScriptGeneration } from "@/common/ai-script-intent";
 import { addBackgroundHandlers } from "./bridge";
 import { sendCmd } from "./util";
 
@@ -363,7 +364,11 @@ async function onSend() {
   setStatus("Thinking...");
   renderMessages();
   try {
-    await runChat(prompt, history);
+    if (promptRequestsScriptGeneration(prompt)) {
+      await runScriptGeneration(prompt, history);
+    } else {
+      await runChat(prompt, history);
+    }
     setStatus(DEFAULT_STATUS);
   } catch (err) {
     setStatus(formatError(err), true);
@@ -399,10 +404,6 @@ async function runChat(prompt, history) {
       stopStreaming();
     }
     contextBlocks = mergeContextBlocks(contextBlocks, res?.contextBlocks);
-    if (res?.type === "script") {
-      await handleScriptResponse(res, streamState);
-      return res;
-    }
     if (res?.type !== "contextRequest") {
       streamState.commit(`${res?.content || ""}`.trim() || "(empty response)");
       return res;
@@ -420,6 +421,17 @@ async function runChat(prompt, history) {
     setStatus("Refining the answer...");
   }
   throw new Error("AI requested too many context fetch rounds.");
+}
+
+async function runScriptGeneration(prompt, history) {
+  setStatus("Generating userscript...");
+  const res = await sendCmd("AiGenerateScriptForPage", {
+    prompt,
+    history,
+    page: collectPageIndex(),
+    requestId: createRequestId(),
+  });
+  await handleGeneratedScriptResult(res as PageChatResponse);
 }
 
 function createAssistantStreamState() {
@@ -925,16 +937,16 @@ function formatError(err) {
   return err?.message || `${err || "AI request failed."}`;
 }
 
-async function handleScriptResponse(
+async function handleGeneratedScriptResult(
   res: PageChatResponse,
-  streamState: ReturnType<typeof createAssistantStreamState>,
+  streamState?: ReturnType<typeof createAssistantStreamState>,
 ) {
   const code = `${res?.code || ""}`.trim();
   if (!code) {
     throw new Error("AI did not return any userscript code.");
   }
   if (hasSaveAction(res.plan)) {
-    streamState.discard();
+    streamState?.discard();
     setStatus("Saving script...");
     try {
       const saved = (await sendCmd("AiSaveGeneratedScript", {
@@ -958,7 +970,14 @@ async function handleScriptResponse(
       throw err;
     }
   }
-  streamState.commit(code);
+  if (streamState) {
+    streamState.commit(code);
+  } else {
+    messages.push({
+      role: "assistant",
+      content: code,
+    });
+  }
 }
 
 function hasSaveAction(

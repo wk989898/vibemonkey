@@ -54,6 +54,31 @@ export function extractGeneratePlan(content: string): AiGeneratePlan | null {
   return null;
 }
 
+export function buildGeneratePlanFromActions(actions: (AiGeneratePlanAction | null | undefined)[]) {
+  const normalized = actions.filter(Boolean);
+  return normalized.length ? { actions: normalized } : null;
+}
+
+export function normalizeGenerateToolCall(name: string, args: unknown): AiGeneratePlanAction | null {
+  switch (name) {
+    case "apply_code":
+    case "close_editor":
+      return normalizePlanAction({ tool: name });
+    case "save_script":
+      return normalizePlanAction({
+        mode: (args as Record<string, unknown> | null | undefined)?.mode,
+        tool: name,
+      });
+    case "update_script_settings":
+      return normalizePlanAction({
+        settings: args,
+        tool: name,
+      });
+    default:
+      return null;
+  }
+}
+
 function normalizeGeneratePlan(data: unknown): AiGeneratePlan | null {
   if (!data || typeof data !== "object") {
     return null;
