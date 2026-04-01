@@ -2,7 +2,9 @@
   <div class="ai-assistant shelf mr-2c flex flex-col">
     <div class="flex ai-assistant__header">
       <strong>AI Assistant</strong>
-      <span class="ml-1 subtle">Generates code into the editor but does not save it.</span>
+      <span class="ml-1 subtle">
+        Generates code into the editor. It auto-saves only when you explicitly ask it to save.
+      </span>
     </div>
     <textarea
       v-model="prompt"
@@ -25,10 +27,16 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { getUniqId, sendCmd } from "@/common";
 import { AI_STREAM_EVENT, type AiStreamPayload } from "@/common/ai-stream";
 import handlers from "@/common/handlers";
+import {
+  resolveGeneratePlan,
+  type GeneratePlan,
+  type GeneratePlanSettings,
+  type GenerateSaveMode,
+} from "./ai-intent";
 
 type ScriptSummary = {
   id: number | null;
@@ -43,6 +51,7 @@ type ScriptSummary = {
 };
 
 type GenerateResponse = {
+  plan?: Partial<GeneratePlan> | null;
   code: string;
   content: string;
   model: string;
@@ -52,8 +61,11 @@ type GenerateResponse = {
 };
 
 const props = defineProps<{
+  applyScriptSettings: (settings: GeneratePlanSettings) => void;
+  closeEditor: () => void;
   disabled?: boolean;
   getCode: () => string;
+  saveCode: (mode: GenerateSaveMode, force?: boolean) => Promise<boolean>;
   script: VMScript;
 }>();
 const emit = defineEmits<{
@@ -106,12 +118,32 @@ async function generate() {
       requestId: activeRequestId,
       script: buildScriptSummary(props.script),
     })) as GenerateResponse;
+    const plan = resolveGeneratePlan(res.plan, prompt.value, props.script);
+    const saveMode = getPlanSaveMode(plan);
     emit("apply", res.code);
-    preview.value = res.content || preview.value;
+    const settings = getPlanSettings(plan);
+    if (settings) {
+      props.applyScriptSettings(settings);
+    }
     const tokens = res.usage?.total_tokens
       ? `, ${res.usage.total_tokens.toLocaleString()} tokens`
       : "";
-    status.value = `Applied ${res.model}${tokens}. Review and save when ready.`;
+    if (saveMode) {
+      await nextTick();
+      if (await props.saveCode(saveMode, true)) {
+        preview.value = "";
+        status.value = getSavedStatus(plan, res.model, tokens);
+        if (hasPlanTool(plan, "close_editor")) {
+          props.closeEditor();
+        }
+      } else {
+        preview.value = res.code || preview.value;
+        error.value ||= "Automatic save failed. Review the generated script and save it manually.";
+      }
+    } else {
+      preview.value = res.code || preview.value;
+      status.value = `Applied ${res.model}${tokens}. Review and save when ready.`;
+    }
   } catch (err) {
     error.value = err.message || `${err}`;
   } finally {
@@ -136,6 +168,30 @@ function buildScriptSummary(script: VMScript): ScriptSummary {
     grant: meta.grant || [],
     enabled: !!config.enabled,
   };
+}
+
+function getSavedStatus(plan: GeneratePlan, model: string, tokens: string) {
+  if (getPlanSaveMode(plan) === "create") {
+    return `Created and saved with ${model}${tokens}.`;
+  }
+  if (hasPlanTool(plan, "close_editor")) {
+    return `Saved and closed with ${model}${tokens}.`;
+  }
+  return `Updated and saved with ${model}${tokens}.`;
+}
+
+function getPlanSaveMode(plan: GeneratePlan) {
+  const action = plan.actions.find((item) => item.tool === "save_script");
+  return action?.mode || null;
+}
+
+function hasPlanTool(plan: GeneratePlan, tool: GeneratePlan["actions"][number]["tool"]) {
+  return plan.actions.some((item) => item.tool === tool);
+}
+
+function getPlanSettings(plan: GeneratePlan) {
+  const action = plan.actions.find((item) => item.tool === "update_script_settings");
+  return action?.tool === "update_script_settings" ? action.settings : null;
 }
 </script>
 

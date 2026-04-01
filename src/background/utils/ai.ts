@@ -7,19 +7,27 @@ import {
   getAiErrorMessage,
   parseAiResponseBody,
 } from "./ai-response";
+import { extractGeneratePlan, extractGeneratedCode } from "./ai-generate";
 import { getScriptsByURL } from "./db";
 import { addOwnCommands, addPublicCommands } from "./init";
 import { getOption } from "./options";
 import storage, { S_CODE } from "./storage";
 
-const CODE_BLOCK_RE = /```(?:javascript|js)?\s*([\s\S]*?)```/i;
 const JSON_BLOCK_RE = /```json\s*([\s\S]*?)```/i;
 const DEFAULT_GENERATE_SYSTEM_PROMPT = [
   "You are an expert userscript author working inside Violentmonkey.",
   "Return a complete userscript file that the user can save immediately.",
   "Always include a valid ==UserScript== metadata block.",
   "Preserve the intent of the existing script unless the user explicitly asks to change it.",
-  "Return code only, wrapped in a single ```javascript``` block.",
+  'Before the code, return one ```json``` block with {"actions":[...]} describing tool calls.',
+  'Always include {"tool":"apply_code"} as the first action.',
+  'Use {"tool":"update_script_settings","settings":{...}} only when the user explicitly asks to change editor-side settings such as enabled state, tags, @run-at, @inject-into, custom name, or custom description.',
+  'Use {"tool":"save_script","mode":"create"} only when the user explicitly asks to create/save/install a new script now, including saving the current draft as a separate new script.',
+  'Use {"tool":"save_script","mode":"update"} only when the user explicitly asks to save the current script in place.',
+  'Use {"tool":"close_editor"} only when the user explicitly asks to save and close immediately.',
+  'For normal drafting or refactoring without explicit save intent, return only {"actions":[{"tool":"apply_code"}]}.',
+  "After the JSON block, return the code in a single ```javascript``` block.",
+  "Do not add prose outside those blocks.",
 ].join("\n");
 const DEFAULT_PAGE_CHAT_SYSTEM_PROMPT = [
   "You are an AI assistant embedded in a live web page via Violentmonkey.",
@@ -85,11 +93,13 @@ addOwnCommands({
       src,
     });
     const content = getAiMessageContent(data);
+    const plan = extractGeneratePlan(content);
     const generated = extractGeneratedCode(content);
     if (!generated.includes("==UserScript==")) {
       throw new SafeError("AI response did not contain a valid userscript metablock.");
     }
     return {
+      plan,
       code: generated,
       content,
       model,
@@ -225,12 +235,6 @@ function getFenceType(mime) {
       "application/json": "json",
     }[mime] || "text"
   );
-}
-
-function extractGeneratedCode(content) {
-  const match = CODE_BLOCK_RE.exec(content);
-  const code = (match?.[1] || content || "").trim();
-  return code && !code.endsWith("\n") ? `${code}\n` : code;
 }
 
 function getAiMessageContent(data) {

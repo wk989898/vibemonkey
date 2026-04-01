@@ -70,9 +70,12 @@
     </div>
 
     <vm-ai
+      :apply-script-settings="applyAiScriptSettings"
       v-if="nav === 'code' && aiShown && !frozen"
+      :close-editor="closeAiEditor"
       :script="script"
       :get-code="getCode"
+      :save-code="saveAiCode"
       @apply="applyAiCode"
     />
 
@@ -398,15 +401,41 @@ function applyAiCode(newCode) {
   });
   CM.focus();
 }
-async function save() {
-  if (!canSave.value) return;
+function applyAiScriptSettings(settings) {
+  const scr = script.value;
+  if (!scr) {
+    return;
+  }
+  const { config, custom } = scr;
+  if (typeof settings.enabled === "boolean") {
+    config.enabled = settings.enabled;
+  }
+  if (typeof settings.name === "string") {
+    custom.name = settings.name;
+  }
+  if (typeof settings.description === "string") {
+    custom.description = settings.description;
+  }
+  if (Array.isArray(settings.tags)) {
+    custom.tags = settings.tags.join(" ");
+  }
+  if (typeof settings.runAt === "string") {
+    custom.runAt = settings.runAt;
+  }
+  if (typeof settings.injectInto === "string") {
+    custom.injectInto = settings.injectInto;
+  }
+}
+async function save(force = false, saveAsNew = false) {
+  if (!force && !canSave.value) return false;
   if (shouldSavePositionOnSave) savePosition();
   const scr = script.value;
   const { config, custom } = scr;
   const { notifyUpdates } = config;
   const { noframes } = custom;
   try {
-    const id = scr.props.id;
+    const currentId = scr.props.id;
+    const id = saveAsNew ? null : currentId;
     const res = await sendCmdDirectly("ParseScript", {
       id,
       code: $codeComp.getRealContent(),
@@ -425,7 +454,7 @@ async function save() {
       // User created scripts MUST be marked `isNew` so that
       // the backend is able to check namespace conflicts,
       // otherwise the script with same namespace will be overridden
-      isNew: !id,
+      isNew: saveAsNew || !id,
       message: "",
       bumpDate: true,
     });
@@ -436,11 +465,21 @@ async function save() {
     frozenNote.value = false;
     errors.value = res.errors;
     script.value = res.update; // triggers onScript+onChange to handle the new `meta` and `props`
-    if (newId && !id) history.replaceState(null, scriptName.value, `${ROUTE_SCRIPTS}/${newId}`);
+    if (newId && (!currentId || saveAsNew)) {
+      history.replaceState(null, scriptName.value, `${ROUTE_SCRIPTS}/${newId}`);
+    }
     fatal.value = null;
+    return true;
   } catch (err) {
     fatal.value = err.message.split("\n");
+    return false;
   }
+}
+function saveAiCode(mode, force = true) {
+  return save(force, mode === "create");
+}
+function closeAiEditor() {
+  close(true);
 }
 function close(entirely?: boolean) {
   if (!entirely && nav.value !== "code") {
@@ -452,8 +491,9 @@ function close(entirely?: boolean) {
   }
 }
 async function saveClose() {
-  await save();
-  close(true);
+  if (await save()) {
+    close(true);
+  }
 }
 function switchPanel(step) {
   const keys = Object.keys(navItems.value);
