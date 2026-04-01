@@ -1,3 +1,9 @@
+import {
+  promptRequestsClose,
+  promptRequestsNewScript,
+  promptRequestsSave,
+} from "@/common/ai-script-intent";
+
 export type GenerateSaveMode = "create" | "update";
 
 export type GeneratePlanAction =
@@ -35,27 +41,15 @@ type ScriptRef = {
   } | null;
 } | null;
 
-const AUTO_CLOSE_EN_RE = /\b(?:close|exit)\b/i;
-const AUTO_CLOSE_ZH_RE = /(?:关闭|关掉|退出)/;
-const AUTO_NEW_SCRIPT_EN_RE =
-  /\b(?:new|separate|another|copy|duplicate)\b[\s\S]{0,40}\bscript\b|\bsave as new\b/i;
-const AUTO_NEW_SCRIPT_ZH_RE = /(?:另存为新脚本|保存为新脚本|新脚本|副本|复制一份)/;
-const AUTO_SAVE_EN_RE = /\b(?:save|install|persist)\b/i;
-const AUTO_SAVE_ZH_RE = /(?:保存|另存|存起来|存下|安装|自动保存)/;
-
 export function inferGeneratePlan(prompt: string, script: ScriptRef): GeneratePlan {
-  const text = `${prompt || ""}`.trim();
-  const wantsSave = AUTO_SAVE_EN_RE.test(text) || AUTO_SAVE_ZH_RE.test(text);
-  if (!wantsSave) {
+  if (!promptRequestsSave(prompt)) {
     return {
       actions: [{ tool: "apply_code" }],
     };
   }
   return buildGeneratePlan(
-    !script?.props?.id || AUTO_NEW_SCRIPT_EN_RE.test(text) || AUTO_NEW_SCRIPT_ZH_RE.test(text)
-      ? "create"
-      : "update",
-    AUTO_CLOSE_EN_RE.test(text) || AUTO_CLOSE_ZH_RE.test(text),
+    !script?.props?.id || promptRequestsNewScript(prompt) ? "create" : "update",
+    promptRequestsClose(prompt),
   );
 }
 

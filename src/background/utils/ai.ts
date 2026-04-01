@@ -8,7 +8,7 @@ import {
   parseAiResponseBody,
 } from "./ai-response";
 import { extractGeneratePlan, extractGeneratedCode } from "./ai-generate";
-import { getScriptsByURL } from "./db";
+import { getScriptsByURL, parseScript } from "./db";
 import { addOwnCommands, addPublicCommands } from "./init";
 import { getOption } from "./options";
 import storage, { S_CODE } from "./storage";
@@ -37,6 +37,10 @@ const DEFAULT_PAGE_CHAT_SYSTEM_PROMPT = [
   "Prefer searchHtml, searchText, or searchScriptTags before requesting raw HTML or source code.",
   "Use getUserscript only for matched userscripts listed in the provided summaries.",
   "Use getScriptTag for script tags listed in the page index. External script src files will be fetched on demand.",
+  'If the user asks you to create a userscript, return one ```json``` block with {"actions":[...]} describing tool calls, then one ```javascript``` block with the complete userscript.',
+  'For userscript creation, always include {"tool":"apply_code"} as the first action.',
+  'Use {"tool":"save_script","mode":"create"} only when the user explicitly asks to save, install, or create the script now.',
+  "If you generate a userscript, do not add prose outside the JSON and code blocks.",
   "Once you have enough information, answer normally and do not output JSON.",
   "Answer only from the supplied context. Do not invent selectors, functions, or page behavior.",
   "If the supplied snippets are truncated, say so and ask a narrower follow-up question.",
@@ -76,9 +80,7 @@ addOwnCommands({
     if (!prompt) {
       throw new SafeError("AI prompt is empty.");
     }
-    code = `${code || ""}`;
-    const { data, model } = await callAiApi({
-      temperature: 0.2,
+    return generateScriptWithAi({
       messages: [
         {
           role: "system",
@@ -86,29 +88,42 @@ addOwnCommands({
         },
         {
           role: "user",
-          content: buildGeneratePrompt(prompt, code, script),
+          content: buildGeneratePrompt(prompt, `${code || ""}`, script),
         },
       ],
       requestId: normalizeRequestId(requestId),
       src,
     });
-    const content = getAiMessageContent(data);
-    const plan = extractGeneratePlan(content);
-    const generated = extractGeneratedCode(content);
-    if (!generated.includes("==UserScript==")) {
-      throw new SafeError("AI response did not contain a valid userscript metablock.");
-    }
-    return {
-      plan,
-      code: generated,
-      content,
-      model,
-      usage: data.usage || null,
-    };
   },
 });
 
 addPublicCommands({
+  async AiSaveGeneratedScript({ code } = {}) {
+    const generated = `${code || ""}`;
+    if (!generated.trim()) {
+      throw new SafeError("Generated script is empty.");
+    }
+    if (!generated.includes("==UserScript==")) {
+      throw new SafeError("Generated script did not contain a valid userscript metablock.");
+    }
+    const result = await parseScript({
+      [S_CODE]: generated,
+      bumpDate: true,
+      config: {
+        enabled: 1,
+        shouldUpdate: 1,
+      },
+      custom: {},
+      isNew: true,
+      message: "",
+      props: {},
+    });
+    return {
+      id: result.where?.id || 0,
+      message: result.update.message || "",
+      name: getScriptName(result.update),
+    };
+  },
   async AiPageChat({ prompt, history, page, contextBlocks, requestId } = {}, src) {
     prompt = `${prompt || ""}`.trim();
     if (!prompt) {
@@ -148,6 +163,17 @@ addPublicCommands({
         requests: resolved.pageRequests,
         contextBlocks: resolved.contextBlocks,
         model,
+        usage: data.usage || null,
+      };
+    }
+    const generated = extractGeneratedCode(content);
+    if (generated.includes("==UserScript==")) {
+      return {
+        type: "script",
+        code: generated,
+        content,
+        model,
+        plan: extractGeneratePlan(content),
         usage: data.usage || null,
       };
     }
@@ -264,6 +290,28 @@ function getAiMessageContent(data) {
       .trim();
   }
   throw new SafeError("AI response did not contain assistant content.");
+}
+
+async function generateScriptWithAi({ messages, requestId, src }) {
+  const { data, model } = await callAiApi({
+    temperature: 0.2,
+    messages,
+    requestId,
+    src,
+  });
+  const content = getAiMessageContent(data);
+  const plan = extractGeneratePlan(content);
+  const generated = extractGeneratedCode(content);
+  if (!generated.includes("==UserScript==")) {
+    throw new SafeError("AI response did not contain a valid userscript metablock.");
+  }
+  return {
+    plan,
+    code: generated,
+    content,
+    model,
+    usage: data.usage || null,
+  };
 }
 
 async function callAiApi({ messages, temperature = 0.2, requestId, src }) {

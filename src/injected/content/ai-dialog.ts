@@ -20,7 +20,7 @@ const MAX_REQUEST_TEXT_CHARS = 12000;
 const MAX_REQUEST_SCRIPT_CHARS = 12000;
 const KEYBOARD_EVENTS = ["keydown", "keypress", "keyup"] as const;
 const DEFAULT_STATUS =
-  "AI starts from a lightweight page index and fetches HTML or scripts only when needed.";
+  "AI starts from a lightweight page index and fetches HTML or scripts only when needed. It can also create and save userscripts for the current page.";
 const PANEL_CSS = `
 :host {
   all: initial;
@@ -196,6 +196,27 @@ let requestSequence = 0;
 let panelRoot: HTMLElement | null = null;
 const streamListeners = Object.create(null) as Record<string, (delta: string) => void>;
 
+type PageChatResponse = {
+  code?: string;
+  content?: string;
+  contextBlocks?: unknown[];
+  model?: string;
+  plan?: {
+    actions?: Array<{
+      mode?: string;
+      tool?: string;
+    }>;
+  } | null;
+  requests?: unknown[];
+  type?: "contextRequest" | "final" | "script";
+};
+
+type SavedScriptResponse = {
+  id?: number;
+  message?: string;
+  name?: string;
+};
+
 addBackgroundHandlers(
   {
     AiOpenPanel() {
@@ -249,7 +270,7 @@ function ensurePanel() {
       <div class="vm-ai-footer">
         <div class="vm-ai-status"></div>
         <textarea class="vm-ai-input" spellcheck="false"
-          placeholder="Ask about this page. AI will request HTML, script, or userscript snippets only when needed."></textarea>
+          placeholder="Ask about this page, or ask AI to create and save a userscript for it."></textarea>
         <div class="vm-ai-actions">
           <button type="button" class="vm-ai-send">Send</button>
         </div>
@@ -365,19 +386,23 @@ async function runChat(prompt, history) {
       setStatus("Streaming reply...");
       renderMessages();
     });
-    let res;
+    let res: PageChatResponse;
     try {
-      res = await sendCmd("AiPageChat", {
+      res = (await sendCmd("AiPageChat", {
         prompt,
         history,
         page: collectPageIndex(),
         contextBlocks,
         requestId,
-      });
+      })) as PageChatResponse;
     } finally {
       stopStreaming();
     }
     contextBlocks = mergeContextBlocks(contextBlocks, res?.contextBlocks);
+    if (res?.type === "script") {
+      await handleScriptResponse(res, streamState);
+      return res;
+    }
     if (res?.type !== "contextRequest") {
       streamState.commit(`${res?.content || ""}`.trim() || "(empty response)");
       return res;
@@ -421,7 +446,7 @@ function createAssistantStreamState() {
       content += delta;
       if (!revealed) {
         const trimmed = content.trimStart();
-        if (!trimmed || trimmed.startsWith("{")) {
+        if (!trimmed || trimmed.startsWith("{") || trimmed.startsWith("```json")) {
           return;
         }
         revealed = true;
@@ -461,7 +486,7 @@ function renderMessages() {
     const empty = document.createElement("div");
     empty.className = "vm-ai-empty";
     empty.textContent =
-      "The assistant starts from a lightweight page index. It can then search HTML, inspect specific script tags, or fetch matched userscript code only when needed.";
+      "The assistant starts from a lightweight page index. It can search HTML, inspect script tags, fetch matched userscript code, and create a new userscript for the current page.";
     parent.append(empty);
   } else {
     messages.forEach((item) => {
@@ -898,4 +923,48 @@ function trimText(text, maxLength) {
 
 function formatError(err) {
   return err?.message || `${err || "AI request failed."}`;
+}
+
+async function handleScriptResponse(
+  res: PageChatResponse,
+  streamState: ReturnType<typeof createAssistantStreamState>,
+) {
+  const code = `${res?.code || ""}`.trim();
+  if (!code) {
+    throw new Error("AI did not return any userscript code.");
+  }
+  if (hasSaveAction(res.plan)) {
+    streamState.discard();
+    setStatus("Saving script...");
+    try {
+      const saved = (await sendCmd("AiSaveGeneratedScript", {
+        code,
+      })) as SavedScriptResponse;
+      messages.push({
+        role: "assistant",
+        content: [
+          `Created and saved script${saved?.name ? ` "${saved.name}"` : ""}.`,
+          saved?.id ? `Script ID: ${saved.id}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+      return;
+    } catch (err) {
+      messages.push({
+        role: "assistant",
+        content: code,
+      });
+      throw err;
+    }
+  }
+  streamState.commit(code);
+}
+
+function hasSaveAction(
+  plan: PageChatResponse["plan"],
+) {
+  return !!plan?.actions?.some(
+    (action) => action?.tool === "save_script" && action?.mode === "create",
+  );
 }
